@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { loadItem, loadItemPromos, loadMeta, loadStores } from '../lib/data'
 import { formatKm, formatPrice, formatUpdated } from '../lib/format'
 import { DEFAULT_RADIUS_KM, chainOffers, unitPrice, type ChainOffer, type Place } from '../lib/nearby'
+import { listsStore, useLists } from '../lib/lists'
 import { promoLabel, type Blocker, type PricingContext, type Promo } from '../lib/promos'
+import { listHref } from '../lib/router'
 import type { ItemPrices, Meta, StoresByChain } from '../lib/types'
 import { QuantityStepper } from './QuantityStepper'
 
@@ -36,6 +38,8 @@ export function ProductPage({ barcode, place, ctx }: { barcode: string; place: P
   const data = loaded?.barcode === barcode ? loaded : null
   const error = failed === barcode
   const qty = qtyFor?.barcode === barcode ? qtyFor.qty : 1
+  const { active } = useLists()
+  const listed = active.items.find((i) => i.barcode === barcode)
 
   const offers = useMemo(
     () => (data?.item ? chainOffers(data.item, data.stores, place, { qty, ctx, promos: data.promos }) : []),
@@ -70,7 +74,22 @@ export function ProductPage({ barcode, place, ctx }: { barcode: string; place: P
         </p>
       </header>
 
-      <QuantityStepper weighted={item.w} value={qty} onChange={(q) => setQtyFor({ barcode, qty: q })} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <QuantityStepper weighted={item.w} value={qty} onChange={(q) => setQtyFor({ barcode, qty: q })} />
+        <button
+          type="button"
+          className="rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white"
+          onClick={() => listsStore.addItem({ barcode, name: item.n, weighted: item.w }, qty)}
+          data-testid="product-add-to-list"
+        >
+          + הוספה לרשימה
+        </button>
+      </div>
+      {listed && (
+        <p className="text-sm text-emerald-800" data-testid="product-in-list">
+          ברשימה „{active.name}”: {listed.qty} {item.w ? 'ק"ג' : "יח'"} · <a href={listHref} className="underline">לרשימה</a>
+        </p>
+      )}
 
       {!place && (
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900" data-testid="no-place-note">

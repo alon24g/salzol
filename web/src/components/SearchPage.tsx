@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadSearch } from '../lib/data'
+import { loadItem, loadSearch } from '../lib/data'
+import { listsStore, useLists } from '../lib/lists'
 import { productHref, searchHref } from '../lib/router'
 import { ProductSearch } from '../lib/search'
 
@@ -34,6 +35,8 @@ export function SearchPage({ initialQuery }: { initialQuery: string }) {
     return () => clearTimeout(t)
   }, [query])
 
+  const { active } = useLists()
+  const inList = new Set(active.items.map((i) => i.barcode))
   const hits = useMemo(() => (engine ? engine.search(query) : []), [engine, query])
   const trimmed = query.trim()
 
@@ -74,8 +77,8 @@ export function SearchPage({ initialQuery }: { initialQuery: string }) {
       {hits.length > 0 && (
         <ul className="divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white" data-testid="search-results">
           {hits.map((h) => (
-            <li key={h.barcode}>
-              <a href={productHref(h.barcode)} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-stone-50" data-testid="search-result">
+            <li key={h.barcode} className="flex items-stretch">
+              <a href={productHref(h.barcode)} className="flex flex-1 items-center justify-between gap-3 px-4 py-3 hover:bg-stone-50" data-testid="search-result">
                 <span className="flex flex-col">
                   <span className="font-medium">{h.name}</span>
                   <span className="text-sm text-stone-500">
@@ -87,6 +90,19 @@ export function SearchPage({ initialQuery }: { initialQuery: string }) {
                   {h.chains === 1 ? 'רשת אחת' : `${h.chains} רשתות`}
                 </span>
               </a>
+              <button
+                type="button"
+                className={`shrink-0 border-s border-stone-200 px-3 text-sm ${inList.has(h.barcode) ? 'text-stone-400' : 'text-emerald-800'}`}
+                aria-label={`הוספת ${h.name} לרשימה`}
+                onClick={async () => {
+                  // Search rows don't say whether an item is sold by weight; its price shard does.
+                  const it = await loadItem(h.barcode).catch(() => null)
+                  listsStore.addItem({ barcode: h.barcode, name: h.name, weighted: it?.w ?? false }, 1)
+                }}
+                data-testid="add-to-list"
+              >
+                {inList.has(h.barcode) ? '✓ ברשימה' : '+ לרשימה'}
+              </button>
             </li>
           ))}
         </ul>

@@ -22,7 +22,8 @@ test.describe('search → product', () => {
     const search = new SearchPage(page)
     await search.goto()
     await search.search('במב בוטני') // prefixes; "בוטני" must match "בוטנים"
-    await expect(search.results.filter({ hasText: 'במבה חטיף בוטנים אסם 80 גרם' })).toHaveCount(1)
+    // identify by barcode: display names drift as chains rename items
+    await expect(search.results.filter({ hasText: '7290000066318' })).toHaveCount(1) // במבה בוטנים אסם
   })
 
   test('exact barcode search, including a zero-padded code', async ({ page }) => {

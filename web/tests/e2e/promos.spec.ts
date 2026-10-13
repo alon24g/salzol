@@ -27,12 +27,12 @@ test.describe('promotions', () => {
     await product.goto(PALMOLIVE)
     const victory = product.offer('victory')
     await expect(victory.locator('[data-testid="promo-other"][data-why="club"]')).toContainText('מקס ויקטורי')
-    await expect.poll(async () => (await product.chainOrder())[0]).not.toBe('victory')
+    await expect(victory.getByTestId('cheapest-price')).toContainText('17.90') // general promo only
 
     await new PricingSettings(page).joinClub('victory')
     await expect(victory.getByTestId('cheapest-price')).toContainText('13.90')
     await expect(victory.getByTestId('promo-applied')).toContainText('למועדון בלבד')
-    await expect.poll(async () => (await product.chainOrder())[0]).toBe('victory')
+    await expect(victory.locator('[data-testid="promo-other"][data-why="club"]')).toHaveCount(0)
   })
 
   test('club membership is remembered', async ({ page }) => {

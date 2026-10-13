@@ -80,3 +80,57 @@ export class Quantity {
     await expect(value).toHaveText(String(n))
   }
 }
+
+type ShareWindow = Window & { __shared?: string }
+
+export class ListPage {
+  readonly items: Locator
+  constructor(private page: Page) {
+    this.items = page.getByTestId('list-item')
+  }
+  async goto() {
+    await this.page.goto('./#/list')
+    await expect(this.page.getByTestId('list-page')).toBeVisible()
+  }
+  item(barcode: string) {
+    return this.page.locator(`[data-testid="list-item"][data-barcode="${barcode}"]`)
+  }
+  async newList(name: string) {
+    this.page.once('dialog', (d) => d.accept(name))
+    await this.page.getByTestId('list-new').click()
+  }
+  /** Click "share" with navigator.share stubbed; returns the shared URL. */
+  async shareUrl(): Promise<string> {
+    await this.page.evaluate(() => {
+      navigator.share = async (data?: ShareData) => {
+        ;(window as ShareWindow).__shared = data?.url
+      }
+    })
+    await this.page.getByTestId('list-share').click()
+    await expect.poll(() => this.page.evaluate(() => (window as ShareWindow).__shared)).toBeTruthy()
+    return (await this.page.evaluate(() => (window as ShareWindow).__shared))!
+  }
+}
+
+export class ComparePage {
+  readonly baskets: Locator
+  constructor(private page: Page) {
+    this.baskets = page.getByTestId('basket')
+  }
+  async goto() {
+    await this.page.goto('./#/compare')
+    await expect(this.page.getByTestId('compare-page')).toBeVisible()
+  }
+  basket(chain: string) {
+    return this.page.locator(`[data-testid="basket"][data-chain="${chain}"]`)
+  }
+  async totals(): Promise<number[]> {
+    await expect(this.baskets.first()).toBeVisible()
+    return (await this.page.getByTestId('basket-total').allInnerTexts()).map(money)
+  }
+}
+
+/** "‏17.90 ‏₪" → 17.9 */
+export function money(text: string): number {
+  return Number(text.replace(/[^\d.]/g, ''))
+}

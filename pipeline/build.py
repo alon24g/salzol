@@ -27,6 +27,10 @@ from .parse import parse_price_file, parse_stores_file
 # Eilat is VAT-exempt, so its stores would always be "cheapest"; excluded by product decision.
 EXCLUDED_SETTLEMENTS = {2600}  # CBS settlement codes
 
+# StoreType in Stores files: 1 = physical, 2 = online only, 3 = both (seen in all 3 chains:
+# "שופרסל ONLINE", "מרלוג אינטרנט", Victory "אינטרנט"). Online-only stores are excluded.
+ONLINE_STORE_TYPE = "2"
+
 # ScraperFactory name → public chain slug + Hebrew display name.
 CHAINS = {
     "SHUFERSAL": ("shufersal", "שופרסל"),
@@ -184,10 +188,14 @@ def build(raw: Path, out: Path) -> dict:
         info["file_chain_name"] = store_rows[0].chain_name if store_rows else ""
         idx_of: dict[str, int | None] = {}  # store key → index in stores_out, None = excluded
         stores_out[slug] = []
-        excluded = unlocated = 0
+        excluded = unlocated = online = 0
         for s in store_rows:
             k = store_key(s.store_id)
             if k in idx_of:
+                continue
+            if s.store_type.strip() == ONLINE_STORE_TYPE:
+                idx_of[k] = None  # online-only: not a store you can walk into
+                online += 1
                 continue
             place = settlements.resolve(s.city, s.address, s.name)
             if place and place["code"] in EXCLUDED_SETTLEMENTS:
@@ -206,7 +214,8 @@ def build(raw: Path, out: Path) -> dict:
                     "lon": place["lon"] if place else None,
                 }
             )
-        info.update(stores=len(stores_out[slug]), excluded_stores=excluded, unlocated_stores=unlocated)
+        info.update(stores=len(stores_out[slug]), excluded_stores=excluded, online_stores_excluded=online,
+                    unlocated_stores=unlocated)
 
         # --- prices
         files, stale = latest_files(cdir / "price_full")
