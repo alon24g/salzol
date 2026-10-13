@@ -18,10 +18,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .fetch import file_key_and_stamp
+from .geo import Settlements
 from .normalize import canonical_barcode, is_valid_price, unit_price
 from .parse import parse_price_file, parse_stores_file
 
-# ScraperFactory name → public chain slug + Hebrew display name fallback.
+# Eilat is VAT-exempt, so its stores would always be "cheapest"; excluded by product decision.
+EXCLUDED_SETTLEMENTS = {2600}  # CBS settlement codes
+
+# ScraperFactory name → public chain slug + Hebrew display name.
 CHAINS = {
     "SHUFERSAL": ("shufersal", "שופרסל"),
     "RAMI_LEVY": ("rami_levy", "רמי לוי"),
@@ -86,7 +90,8 @@ def build(raw: Path, out: Path) -> dict:
     meta_chains: dict[str, dict] = {}
     invalid = Counter()
 
-    for scraper_name, (slug, fallback_name) in CHAINS.items():
+    settlements = Settlements.load()
+    for scraper_name, (slug, display_name) in CHAINS.items():
         cdir = raw / scraper_name
         info: dict = {"slug": slug, "ok": False}
         meta_chains[slug] = info
@@ -97,17 +102,33 @@ def build(raw: Path, out: Path) -> dict:
         # --- stores
         store_files, _ = latest_files(cdir / "stores")
         store_rows = parse_stores_file(max(store_files, key=lambda p: file_key_and_stamp(p.name)[1])) if store_files else []
-        info["name"] = (store_rows[0].chain_name if store_rows else "") or fallback_name
-        idx_of: dict[str, int] = {}
+        info["name"] = display_name
+        info["file_chain_name"] = store_rows[0].chain_name if store_rows else ""
+        idx_of: dict[str, int | None] = {}  # store key → index in stores_out, None = excluded
         stores_out[slug] = []
+        excluded = unlocated = 0
         for s in store_rows:
             k = store_key(s.store_id)
             if k in idx_of:
                 continue
+            place = settlements.resolve(s.city, s.address, s.name)
+            if place and place["code"] in EXCLUDED_SETTLEMENTS:
+                idx_of[k] = None
+                excluded += 1
+                continue
+            unlocated += place is None
             idx_of[k] = len(stores_out[slug])
             stores_out[slug].append(
-                {"id": k, "name": s.name, "city": s.city, "address": s.address, "sub": s.sub_chain_name}
+                {
+                    "id": k,
+                    "name": s.name,
+                    "city": place["name"] if place else "",
+                    "address": s.address,
+                    "lat": place["lat"] if place else None,
+                    "lon": place["lon"] if place else None,
+                }
             )
+        info.update(stores=len(stores_out[slug]), excluded_stores=excluded, unlocated_stores=unlocated)
 
         # --- prices
         files, stale = latest_files(cdir / "price_full")
@@ -123,8 +144,10 @@ def build(raw: Path, out: Path) -> dict:
             k = store_key(pf.store_id)
             if k not in idx_of:  # price file for a store missing from the Stores file
                 idx_of[k] = len(stores_out[slug])
-                stores_out[slug].append({"id": k, "name": "", "city": "", "address": "", "sub": ""})
+                stores_out[slug].append({"id": k, "name": "", "city": "", "address": "", "lat": None, "lon": None})
             sidx = idx_of[k]
+            if sidx is None:  # excluded location (Eilat)
+                continue
             for r in pf.rows:
                 info["rows"] += 1
                 if not is_valid_price(r.price):
@@ -147,7 +170,8 @@ def build(raw: Path, out: Path) -> dict:
                 if up:
                     agg.unit[(round(up[2], 3), up[3], up[1])] += 1
                 agg.prices[slug][r.price].append(sidx)
-        info["updated"] = newest_stamp
+        dt = stamp_to_dt(newest_stamp)
+        info["updated"] = dt.strftime("%Y-%m-%dT%H:%M") if dt else ""  # Israel local time
         info["ok"] = info["rows"] > 0
 
     # --- cross-chain outliers: compare each chain's median to the median of chains
@@ -204,6 +228,14 @@ def build(raw: Path, out: Path) -> dict:
 
     sizes = {"search.json": dump(out / "search.json", search)}
     sizes["stores.json"] = dump(out / "stores.json", stores_out)
+    # Cities that have at least one store, for the manual "my location" picker.
+    cities = {
+        s["city"]: (s["lat"], s["lon"])
+        for ss in stores_out.values()
+        for s in ss
+        if s["city"] and s["lat"] is not None
+    }
+    dump(out / "cities.json", sorted([n, la, lo] for n, (la, lo) in cities.items()))
     shard_sizes = [dump(out / "prices" / f"{i:03d}.json", shards[i]) for i in range(PRICE_SHARDS)]
 
     meta = {
