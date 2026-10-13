@@ -13,6 +13,7 @@ NAME = ("itemname", "itemnm")
 MANUFACTURER = ("manufacturename", "manufacturername")
 WEIGHTED = ("bisweighted", "blsweighted")  # "blsWeighted" (lower-case L) is Wolt's typo
 UPDATED = ("priceupdatetime", "priceupdatedate")
+ITEM_TAGS = ("Item", "item", "ITEM")  # record element; only "Item" seen in real files so far
 
 _NAME_IDS = re.compile(r"^price(?:full)?(?P<chain>\d{13})-(?:(?P<sub>\d{3})-)?(?P<store>\d{3})-\d{8}", re.I)
 
@@ -73,9 +74,8 @@ def parse_price_file(path: Path) -> PriceFile:
         pf.chain_id = pf.chain_id or m["chain"]
         pf.sub_chain_id = pf.sub_chain_id or (m["sub"] or "")
         pf.store_id = pf.store_id or m["store"]
-    for el in root.iter():
-        if not (isinstance(el.tag, str) and el.tag.lower() == "item"):
-            continue
+    # Let lxml filter by tag (C speed) instead of visiting every field element.
+    for el in root.iter(*ITEM_TAGS):
         d = leaf_dict(el)
         code = d.get("itemcode", "")
         if not code:

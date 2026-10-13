@@ -77,7 +77,10 @@ def _latest_per_store(original_unique):
 
 
 def make_scraper(chain: str, out_dir: Path):
-    scraper = ScraperFactory[chain].value(file_output=DiskFileOutput(storage_path=str(out_dir)))
+    # Keep files compressed on disk (~10x smaller); parse.xmlio unwraps gzip/zip itself.
+    scraper = ScraperFactory[chain].value(
+        file_output=DiskFileOutput(storage_path=str(out_dir), extract_gz=False)
+    )
     scraper.max_threads = MAX_CONCURRENT_DOWNLOADS
     scraper.unique = _latest_per_store(scraper.unique)
     if isinstance(scraper, Bina) and scraper.url.startswith("http://"):
