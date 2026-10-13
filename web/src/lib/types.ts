@@ -32,6 +32,7 @@ export type ItemPrices = {
   w: boolean // weighted (price per kg)
   size: Size | null
   c: Record<string, ChainPrices>
+  pr?: Record<string, number[]> // chain → indexes into promos/<chain>/<i / PROMO_CHUNK>.json
 }
 
 export type PriceShard = Record<string, ItemPrices>
@@ -48,6 +49,7 @@ export type ChainMeta = {
 export type Meta = {
   built_at: string
   chains: Record<string, ChainMeta>
+  promo_date_window?: [string, string] // shopping dates the promo data covers
 }
 
 /** cities.json row: [name, lat, lon] */

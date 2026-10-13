@@ -1,7 +1,9 @@
+import type { Promo } from './promos'
 import type { CityRow, ItemPrices, Meta, PriceShard, SearchRow, StoresByChain } from './types'
 
-// Must match PRICE_SHARDS in pipeline/build.py.
+// Must match PRICE_SHARDS / PROMO_CHUNK in pipeline/build.py.
 export const PRICE_SHARDS = 256
+export const PROMO_CHUNK = 500
 
 const DATA = `${import.meta.env.BASE_URL}data/`
 
@@ -44,4 +46,20 @@ export function shardOf(barcode: string): string {
 export async function loadItem(barcode: string): Promise<ItemPrices | null> {
   const shard = await getJson<PriceShard>(`prices/${shardOf(barcode)}.json`)
   return shard[barcode] ?? null
+}
+
+/** The promos an item references, per chain (loads only the chunks needed). */
+export async function loadItemPromos(item: ItemPrices): Promise<Record<string, Promo[]>> {
+  const out: Record<string, Promo[]> = {}
+  await Promise.all(
+    Object.entries(item.pr ?? {}).map(async ([chain, idxs]) => {
+      const chunks = [...new Set(idxs.map((i) => Math.floor(i / PROMO_CHUNK)))]
+      const loaded = new Map<number, Promo[]>()
+      await Promise.all(
+        chunks.map(async (k) => loaded.set(k, await getJson<Promo[]>(`promos/${chain}/${k}.json`))),
+      )
+      out[chain] = idxs.map((i) => loaded.get(Math.floor(i / PROMO_CHUNK))![i % PROMO_CHUNK]).filter(Boolean)
+    }),
+  )
+  return out
 }

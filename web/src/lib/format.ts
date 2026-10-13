@@ -12,3 +12,12 @@ export function formatUpdated(s: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s)
   return m ? `${m[3]}.${m[2]} ${m[4]}:${m[5]}` : '—'
 }
+
+const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+
+/** "היום" or e.g. "יום שני 12.10". */
+export function dayLabel(day: string, today: string): string {
+  if (day === today) return 'היום'
+  const d = new Date(`${day}T12:00:00`)
+  return `יום ${WEEKDAYS[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}`
+}

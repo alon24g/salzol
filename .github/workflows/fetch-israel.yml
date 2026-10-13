@@ -39,7 +39,7 @@ jobs:
 
       - name: Fetch
         shell: powershell
-        run: .\.venv\Scripts\python -m pipeline.fetch --out raw-il --chains $env:ISRAEL_CHAINS --kinds stores,price_full
+        run: .\.venv\Scripts\python -m pipeline.fetch --out raw-il --chains $env:ISRAEL_CHAINS --kinds stores,price_full,promo_full
 
       - uses: actions/upload-artifact@v4
         with:

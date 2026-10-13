@@ -1,0 +1,46 @@
+<Root>
+  <ChainID>7290696200003</ChainID>
+  <SubChainID>001</SubChainID>
+  <StoreID>074</StoreID>
+  <BikoretNo>0</BikoretNo>
+  <Promotions>
+    <Promotion>
+      <PromotionUpdateTime>2026-08-22T13:36:20.000</PromotionUpdateTime>
+      <AllowMultipleDiscounts>0</AllowMultipleDiscounts>
+      <PromotionID>259363</PromotionID>
+      <PromotionDescription>2ב22 חטיף חלבון טבעוני</PromotionDescription>
+      <PromotionStartDateTime>2026-07-20T00:00:00.000</PromotionStartDateTime>
+      <PromotionEndDateTime>2027-12-31T00:00:00.000</PromotionEndDateTime>
+      <PromotionStartHour>06:00:00</PromotionStartHour>
+      <PromotionEndHour>23:59:00</PromotionEndHour>
+      <PromotionDays>2,3</PromotionDays>
+      <RedemptionLimit/>
+      <MinNoOfItemOffered>10</MinNoOfItemOffered>
+      <ClubID>0</ClubID>
+      <IsGiftItem>2</IsGiftItem>
+      <AdditionalIsCoupon>0</AdditionalIsCoupon>
+      <AdditionalRestrictions>הרשת רשאית להפסיק את המבצע בכל עת ללא הודעה מוקדמת</AdditionalRestrictions>
+      <Remarks>הרשת רשאית להפסיק את המבצע בכל עת ללא הודעה מוקדמת</Remarks>
+      <Groups>
+        <Group>
+          <GroupID>1</GroupID>
+          <MinPurchaseAmount/>
+          <DiscountType/>
+          <PromotionItems>
+            <PromotionItem>
+              <ItemCode>7290017850719</ItemCode>
+              <ItemType>1</ItemType>
+              <RewardType>10</RewardType>
+              <MinQty>2</MinQty>
+              <MaxQty/>
+              <DiscountRate>15.06</DiscountRate>
+              <DiscountedPrice>22</DiscountedPrice>
+              <DiscountedPricePerMida>22</DiscountedPricePerMida>
+              <bIsWeighted>0</bIsWeighted>
+            </PromotionItem>
+          </PromotionItems>
+        </Group>
+      </Groups>
+    </Promotion>
+    </Promotions>
+</Root>

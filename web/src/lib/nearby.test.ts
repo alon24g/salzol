@@ -30,29 +30,50 @@ const item: ItemPrices = {
 
 describe('chainOffers', () => {
   it('only counts stores within the radius', () => {
-    const offers = chainOffers(item, stores, TEL_AVIV, 20)
+    const offers = chainOffers(item, stores, TEL_AVIV, { radiusKm: 20 })
     expect(offers.map((o) => o.chain)).toEqual(['a']) // chain b has no store in range
-    expect(offers[0].cheapest.price).toBe(14) // Jerusalem's 12 is out of range
+    expect(offers[0].cheapest.total).toBe(14) // Jerusalem's 12 is out of range
     expect(offers[0].storesAtCheapest).toBe(2)
     expect(offers[0].cheapest.store.id).toBe('1') // same price → nearest first
   })
 
   it('without a place, uses all stores nationwide and sorts chains by price', () => {
     const offers = chainOffers(item, stores, null)
-    expect(offers.map((o) => [o.chain, o.cheapest.price])).toEqual([
+    expect(offers.map((o) => [o.chain, o.cheapest.total])).toEqual([
       ['b', 9],
       ['a', 12],
     ])
   })
 
   it('a larger radius brings far stores in', () => {
-    const offers = chainOffers(item, stores, TEL_AVIV, 60)
-    expect(offers.map((o) => [o.chain, o.cheapest.price])).toEqual([
+    const offers = chainOffers(item, stores, TEL_AVIV, { radiusKm: 60 })
+    expect(offers.map((o) => [o.chain, o.cheapest.total])).toEqual([
       ['b', 9],
       ['a', 12],
     ])
     // the online store (no coordinates) is never "near"
     expect(offers[0].offers).toHaveLength(1)
+  })
+})
+
+describe('chainOffers with promos', () => {
+  const ctx = { day: '2026-10-13', clubs: new Set<string>() }
+  const twoFor = { id: 'p', description: '2 ב-20', start: '2026-10-01T00:00', end: '2026-10-31T23:59', kind: 'n_for_price' as const, value: 20, min_qty: 2 }
+
+  it('ranks by the total for the chosen quantity, with promos applied', () => {
+    // chain a: 12 (Jerusalem) / 14; chain b: 9. With 2 units and "2 ב-20" at chain a only…
+    const offers = chainOffers(item, stores, null, { qty: 2, ctx, promos: { a: [twoFor] } })
+    expect(offers.map((o) => [o.chain, o.cheapest.total])).toEqual([
+      ['b', 18],
+      ['a', 20],
+    ])
+    expect(offers[1].cheapest.applied).toBe(twoFor)
+    expect(offers[1].cheapest.regular).toBe(12)
+  })
+
+  it('a promo outside its dates is ignored', () => {
+    const offers = chainOffers(item, stores, null, { qty: 2, ctx: { ...ctx, day: '2026-11-05' }, promos: { a: [twoFor] } })
+    expect(offers.find((o) => o.chain === 'a')!.cheapest.total).toBe(24)
   })
 })
 

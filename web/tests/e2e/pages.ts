@@ -54,3 +54,29 @@ export class ProductPage {
     return this.offers.evaluateAll((els) => els.map((e) => e.getAttribute('data-chain') ?? ''))
   }
 }
+
+export class PricingSettings {
+  constructor(private page: Page) {}
+  private async open() {
+    if (!(await this.page.getByTestId('shopping-day').isVisible())) {
+      await this.page.getByTestId('pricing-settings-toggle').click()
+    }
+  }
+  async setDay(isoDay: string) {
+    await this.open()
+    await this.page.getByTestId('shopping-day').fill(isoDay)
+  }
+  async joinClub(chain: string) {
+    await this.open()
+    await this.page.getByTestId(`club-${chain}`).check()
+  }
+}
+
+export class Quantity {
+  constructor(private page: Page) {}
+  async set(n: number) {
+    const value = this.page.getByTestId('qty-value')
+    for (let i = Number(await value.innerText()); i < n; i++) await this.page.getByTestId('qty-plus').click()
+    await expect(value).toHaveText(String(n))
+  }
+}

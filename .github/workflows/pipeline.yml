@@ -33,7 +33,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Fetch reachable chains
-        run: python -m pipeline.fetch --out raw --chains "$CLOUD_CHAINS" --kinds stores,price_full
+        run: python -m pipeline.fetch --out raw --chains "$CLOUD_CHAINS" --kinds stores,price_full,promo_full
 
       - name: Add Israel runner data (if fresh)
         env:

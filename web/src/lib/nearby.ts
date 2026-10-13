@@ -1,3 +1,4 @@
+import { priceAtStore, type PricedStore, type PricingContext, type Promo } from './promos'
 import type { ItemPrices, Size, Store, StoresByChain } from './types'
 
 export const DEFAULT_RADIUS_KM = 20
@@ -13,34 +14,41 @@ export function haversineKm(a: { lat: number; lon: number }, b: { lat: number; l
   return 2 * R * Math.asin(Math.sqrt(h))
 }
 
-export type StoreOffer = { store: Store; price: number; distanceKm: number | null }
+export type StoreOffer = { store: Store; distanceKm: number | null } & PricedStore
 
 export type ChainOffer = {
   chain: string
   cheapest: StoreOffer
-  /** stores (in range) charging the cheapest price */
+  /** stores (in range) with the cheapest total */
   storesAtCheapest: number
   /** all in-range stores, cheapest first, then nearest */
   offers: StoreOffer[]
-  /** chain-wide price range, for context */
-  min: number
-  max: number
 }
 
+export type OfferOptions = {
+  radiusKm?: number
+  qty?: number // units, or kg for weighted items
+  ctx?: PricingContext
+  promos?: Record<string, readonly Promo[]>
+}
+
+const NO_PROMOS: readonly Promo[] = []
+
 /**
- * Per chain, the cheapest price at a store within `radiusKm` of `place`.
- * Without a place, every located-or-not store counts (nationwide view).
- * Chains with no store in range are omitted. Result is sorted cheapest first.
+ * Per chain, the cheapest total for `qty` at a store within `radiusKm` of `place`, applying
+ * the promos the user is eligible for on the shopping day. Without a place, every store counts
+ * (nationwide view). Chains with no store in range are omitted. Sorted cheapest first.
  */
 export function chainOffers(
   item: ItemPrices,
   stores: StoresByChain,
   place: Place | null,
-  radiusKm = DEFAULT_RADIUS_KM,
+  { radiusKm = DEFAULT_RADIUS_KM, qty = 1, ctx, promos = {} }: OfferOptions = {},
 ): ChainOffer[] {
   const out: ChainOffer[] = []
   for (const [chain, cp] of Object.entries(item.c)) {
     const chainStores = stores[chain] ?? []
+    const chainPromos = ctx ? (promos[chain] ?? NO_PROMOS) : NO_PROMOS
     const offers: StoreOffer[] = []
     for (const [price, idxs] of cp.p) {
       for (const i of idxs) {
@@ -52,22 +60,23 @@ export function chainOffers(
           distanceKm = haversineKm(place, { lat: store.lat, lon: store.lon })
           if (distanceKm > radiusKm) continue
         }
-        offers.push({ store, price, distanceKm })
+        const priced = ctx
+          ? priceAtStore(price, qty, chain, i, chainPromos, ctx)
+          : { regular: price, total: Math.round(price * qty * 100) / 100, applied: null, other: [] }
+        offers.push({ store, distanceKm, ...priced })
       }
     }
     if (!offers.length) continue
-    offers.sort((a, b) => a.price - b.price || (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
+    offers.sort((a, b) => a.total - b.total || (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
     const cheapest = offers[0]
     out.push({
       chain,
       cheapest,
-      storesAtCheapest: offers.filter((o) => o.price === cheapest.price).length,
+      storesAtCheapest: offers.filter((o) => o.total === cheapest.total).length,
       offers,
-      min: cp.min,
-      max: cp.max,
     })
   }
-  return out.sort((a, b) => a.cheapest.price - b.cheapest.price)
+  return out.sort((a, b) => a.cheapest.total - b.cheapest.total)
 }
 
 /** Unit price for display, e.g. { value: 0.74, per: '100 מ"ל' }. */

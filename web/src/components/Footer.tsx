@@ -13,7 +13,8 @@ export function Footer() {
     <footer className="mt-10 border-t border-stone-200 pt-4 text-xs leading-relaxed text-stone-500" data-testid="footer">
       <p>
         המחירים מבוססים על הקבצים שהרשתות מפרסמות לפי חוק קידום התחרות בענף המזון (שקיפות מחירים). מחיר המדף בפועל עשוי
-        להיות שונה. מבצעים עדיין אינם מוצגים. סניפי אילת אינם נכללים (פטורים ממע"מ).
+        להיות שונה, ולמבצעים עשויים להיות תנאים נוספים (ראו את תיאור המבצע). קופונים אישיים ומבצעים שלא ניתן לפענח
+        אינם נכללים בחישוב. סניפי אילת אינם נכללים (פטורים ממע"מ).
       </p>
       {meta && (
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1" data-testid="chain-freshness">

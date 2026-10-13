@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { LocationBar, ProductPage, SearchPage } from './pages'
 
 // Fixture: real data snapshot from 2026-10-13 (Shufersal, Rami Levy, Victory; Eilat excluded).

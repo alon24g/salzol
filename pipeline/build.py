@@ -14,11 +14,13 @@ import statistics
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from .fetch import file_key_and_stamp
 from .geo import Settlements
+from .manual_deals import load_manual_deals
+from .promos import Promo, parse_promo_file, to_json
 from .normalize import canonical_barcode, is_valid_price, unit_price
 from .parse import parse_price_file, parse_stores_file
 
@@ -33,6 +35,8 @@ CHAINS = {
 }
 
 STALE_AFTER = timedelta(hours=48)  # spec §9
+PROMO_LOOKAHEAD = timedelta(days=14)  # furthest shopping date the UI offers
+PROMO_CHUNK = 500  # promos per file in promos/<chain>/
 PRICE_SHARDS = 256  # barcode → shard by int(barcode) % PRICE_SHARDS
 OUTLIER_FACTOR = 5.0  # a chain's price this far from the cross-chain median is invalid
 
@@ -82,6 +86,79 @@ def latest_files(folder: Path) -> tuple[list[Path], list[str]]:
     return keep, stale
 
 
+def israel_today() -> date:
+    # Israel is UTC+2/+3; promo windows are in Israel local time. +3 is close enough to pick
+    # the calendar day for a build that runs in the morning/afternoon.
+    return (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+
+
+def collect_promos(folder: Path, slug: str, idx_of: dict[str, int | None], info: dict) -> list[tuple[Promo, set[int]]]:
+    """Newest PromoFull per store → promos merged across stores: [(promo, store indexes)].
+
+    Keeps promos active today or starting within PROMO_LOOKAHEAD (the user can pick a future
+    shopping date). The same promo in different stores is stored once: definitions are merged
+    ignoring the item list, and items/stores are unioned. Each store lists only the items it
+    stocks (Shufersal: one promotion → 631 single-store variants), and a store that doesn't
+    stock an item has no price for it, so the union never applies a promo where it shouldn't.
+    Coupons (gift / personal / card coupons) are never applied and are only counted."""
+    if not folder.is_dir():
+        info["promo_error"] = "no promo files"
+        return []
+    files, stale = latest_files(folder)
+    today = israel_today()
+    first_day, last_day = today.isoformat(), (today + PROMO_LOOKAHEAD).isoformat()
+    merged: dict[tuple, tuple[Promo, set[int]]] = {}
+    seen = expired = coupons = 0
+    for p in files:
+        try:
+            store_id, promos = parse_promo_file(p, slug)
+        except Exception as e:  # noqa: BLE001
+            info.setdefault("promo_file_errors", []).append(f"{p.name}: {e}")
+            continue
+        sidx = idx_of.get(store_key(store_id))
+        if sidx is None:  # unknown or excluded (Eilat) store
+            continue
+        for pr in promos:
+            seen += 1
+            if (pr.end and pr.end[:10] < first_day) or (pr.start and pr.start[:10] > last_day):
+                expired += 1
+                continue
+            if pr.is_coupon:
+                coupons += 1
+                continue
+            key = (
+                pr.id.split(":")[1], pr.kind, pr.value, pr.min_qty, pr.get_qty, pr.max_qty, pr.limit,
+                tuple(pr.weekdays or ()), pr.club_only, pr.club_name, pr.min_purchase,
+                pr.conditional, pr.start, pr.end, pr.description,
+            )
+            if key in merged:
+                first, stores = merged[key]
+                stores.add(sidx)
+                if pr.items != first.items:
+                    first.items = sorted(set(first.items) | set(pr.items))
+            else:
+                merged[key] = (pr, {sidx})
+    info.update(promo_files=len(files), promo_stale_files=len(stale), promos_seen=seen,
+                promos_out_of_window=expired, promo_coupons_skipped=coupons, promos=len(merged))
+    return list(merged.values())
+
+
+def resolve_weighted_price(price: float, min_qty_kg: float, regular_per_kg: float) -> float | None:
+    """A weighted promo's DiscountedPrice is either per kg or per MinQty kg (promos.py).
+    Pick the larger reading that still beats the regular per-kg price, else None."""
+    candidates = sorted({price, round(price / min_qty_kg, 2)}, reverse=True)
+    return next((c for c in candidates if c < regular_per_kg), None)
+
+
+def promo_unit_price(pr: Promo) -> float | None:
+    """Price per unit when the promo applies, for sanity checks (None if not comparable)."""
+    if pr.kind == "fixed_price":
+        return pr.value
+    if pr.kind == "n_for_price" and pr.min_qty:
+        return pr.value / pr.min_qty
+    return None
+
+
 def build(raw: Path, out: Path) -> dict:
     t0 = time.monotonic()
     items: dict[str, ItemAgg] = defaultdict(ItemAgg)
@@ -91,6 +168,7 @@ def build(raw: Path, out: Path) -> dict:
     invalid = Counter()
 
     settlements = Settlements.load()
+    chain_promos: dict[str, list[tuple[Promo, set[int]]]] = {}
     for scraper_name, (slug, display_name) in CHAINS.items():
         cdir = raw / scraper_name
         info: dict = {"slug": slug, "ok": False}
@@ -174,6 +252,9 @@ def build(raw: Path, out: Path) -> dict:
         info["updated"] = dt.strftime("%Y-%m-%dT%H:%M") if dt else ""  # Israel local time
         info["ok"] = info["rows"] > 0
 
+        # --- promotions
+        chain_promos[slug] = collect_promos(cdir / "promo_full", slug, idx_of, info)
+
     # --- cross-chain outliers: compare each chain's median to the median of chains
     for bc, agg in items.items():
         if len(agg.prices) < 2:
@@ -185,10 +266,58 @@ def build(raw: Path, out: Path) -> dict:
                 invalid["cross_chain_outlier"] += 1
                 del agg.prices[c]
 
+    # --- manual deals (data/manual_deals.yaml) apply to every store of their chain
+    chain_item_names: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for bc, agg in items.items():
+        for n, chains in agg.names.items():
+            for c in chains:
+                chain_item_names[c][bc].add(n)
+    for pr in load_manual_deals(chain_item_names):
+        if pr.chain in chain_promos:
+            chain_promos[pr.chain].append((pr, set(range(len(stores_out[pr.chain])))))
+
+    # --- promos: per-chain definitions + item → promo index; sanity-check against prices
+    promo_index: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(list))
+    promos_out: dict[str, list[dict]] = {}
+    promo_checks = Counter()
+    for slug, plist in chain_promos.items():
+        n_stores = len(stores_out[slug])
+        promos_out[slug] = []
+        for pr, sidxs in plist:
+            pr.items = [bc for bc in pr.items if slug in items.get(bc, ItemAgg()).prices]
+            if not pr.items:
+                promo_checks["no_priced_items"] += 1
+                continue
+            if pr.kind == "fixed_price_kg_ambiguous":
+                # Weighted promo: DiscountedPrice is either per kg or per MinQty kg (see
+                # promos.py). Pick the larger reading that is still below the regular per-kg
+                # price; if neither is, the promo can't be trusted.
+                regular = max(
+                    statistics.median(p for p, st in items[bc].prices[slug].items() for _ in st) for bc in pr.items
+                )
+                chosen = resolve_weighted_price(pr.value, pr.min_qty, regular)
+                promo_checks["weighted_resolved" if chosen else "weighted_unresolved"] += 1
+                pr.kind, pr.value, pr.min_qty = ("fixed_price", chosen, 0) if chosen else ("unknown", None, 1)
+            unit = promo_unit_price(pr)
+            if pr.applicable and unit is not None and pr.min_qty >= 1:
+                # A real promo should beat the chain's typical regular price for its items.
+                meds = [statistics.median(p for p, st in items[bc].prices[slug].items() for _ in st) for bc in pr.items]
+                promo_checks["cheaper" if unit < max(meds) else "not_cheaper"] += 1
+            d = to_json(pr)
+            d.pop("chain", None)
+            d.pop("store_ids", None)
+            if len(sidxs) < n_stores:
+                d["s"] = sorted(sidxs)  # omitted = every store of the chain
+            idx = len(promos_out[slug])
+            for bc in d.pop("items"):
+                promo_index[bc][slug].append(idx)
+            promos_out[slug].append(d)
+
     # --- write
     if out.exists():
         shutil.rmtree(out)
     (out / "prices").mkdir(parents=True)
+    (out / "promos").mkdir()
 
     search = []
     shards: dict[int, dict] = defaultdict(dict)
@@ -222,6 +351,9 @@ def build(raw: Path, out: Path) -> dict:
             "size": list(size) if size else None,
             "c": per_chain,
         }
+        if bc in promo_index:
+            # chain → indexes into promos/<chain>.json
+            shards[int(bc) % PRICE_SHARDS][bc]["pr"] = {c: v for c, v in promo_index[bc].items() if c in per_chain}
 
     def dump(path: Path, obj) -> int:
         data = json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -239,6 +371,15 @@ def build(raw: Path, out: Path) -> dict:
     }
     dump(out / "cities.json", sorted([n, la, lo] for n, (la, lo) in cities.items()))
     shard_sizes = [dump(out / "prices" / f"{i:03d}.json", shards[i]) for i in range(PRICE_SHARDS)]
+    # Promos are chunked so a product page loads only the chunks its items reference:
+    # promo index i lives in promos/<chain>/<i // PROMO_CHUNK>.json.
+    promo_sizes = {}
+    for slug, plist in promos_out.items():
+        (out / "promos" / slug).mkdir()
+        promo_sizes[slug] = sum(
+            dump(out / "promos" / slug / f"{k}.json", plist[k * PROMO_CHUNK:(k + 1) * PROMO_CHUNK])
+            for k in range((len(plist) + PROMO_CHUNK - 1) // PROMO_CHUNK)
+        )
 
     meta = {
         "built_at": datetime.now(timezone.utc).isoformat(),
@@ -249,7 +390,11 @@ def build(raw: Path, out: Path) -> dict:
             "in_3_chains": sum(1 for e in search if e[3] >= 3),
             "chain_local_items": len(local_items),
             "invalid": dict(invalid),
+            "promos": {slug: len(p) for slug, p in promos_out.items()},
+            "promo_kinds": dict(Counter(d["kind"] for p in promos_out.values() for d in p)),
+            "promo_checks": dict(promo_checks),
         },
+        "promo_date_window": [israel_today().isoformat(), (israel_today() + PROMO_LOOKAHEAD).isoformat()],
         "build_seconds": round(time.monotonic() - t0, 1),
     }
     sizes["meta.json"] = dump(out / "meta.json", meta)
@@ -266,6 +411,9 @@ def build(raw: Path, out: Path) -> dict:
         "price_shards_total_gz": sum(gz(out / "prices" / f"{i:03d}.json") for i in range(PRICE_SHARDS)),
         "price_shard_max": max(shard_sizes),
         "price_shard_median": int(statistics.median(shard_sizes)),
+        "promos": promo_sizes,
+        "promos_gz": {slug: sum(gz(f) for f in (out / "promos" / slug).iterdir()) for slug in promo_sizes},
+        "promo_chunk_max": max((f.stat().st_size for f in (out / "promos").rglob("*.json")), default=0),
     }
     dump(out / "meta.json", meta)
     return meta

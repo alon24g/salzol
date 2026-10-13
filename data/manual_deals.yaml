@@ -1,0 +1,29 @@
+# Hand-curated deals missing from the chains' official promo files (spec §6).
+# Edited via PR. Each entry is validated at build time (pipeline/manual_deals.py).
+#
+# Fields:
+#   chain:        shufersal | rami_levy | victory | …   (slug from pipeline/build.py)
+#   title:        Hebrew text shown on the badge ("מבצע שבועי")
+#   weekdays:     [0..6], 0 = Sunday … 6 = Saturday (optional; omit = every day)
+#   kind:         fixed_price | percent_off | amount_off | n_for_price | buy_x_get_y
+#   value:        price (₪) for fixed_price / n_for_price, % for percent_off, ₪ for amount_off
+#   min_qty:      for n_for_price / buy_x_get_y (default 1);  get_qty: for buy_x_get_y
+#   applies_to:   { barcodes: [...] } and/or { category_keywords: [...] } (matched against item names)
+#   club_only / club_name, start / end (YYYY-MM-DD, optional)
+#   source_url, verified_on (required)
+#
+# NOTE: Victory's weekday deal on organic/vegan products already appears in Victory's own
+# promo files (PromotionDays="2,3"), so it is NOT duplicated here.
+#
+# Example (not active):
+# - chain: victory
+#   title: "יום שני ללא בשר"
+#   weekdays: [1]
+#   kind: percent_off
+#   value: 10
+#   applies_to: { category_keywords: ["טבעוני"] }
+#   club_only: false
+#   source_url: "https://…"
+#   verified_on: "2026-10-13"
+
+[]
