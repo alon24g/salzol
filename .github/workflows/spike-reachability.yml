@@ -1,0 +1,41 @@
+name: M0 reachability spike
+
+on:
+  workflow_dispatch:
+    inputs:
+      chains:
+        description: "Comma-separated ScraperFactory names (empty = all)"
+        required: false
+        default: ""
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Runner egress IP / geo
+        run: curl -s https://ipinfo.io/json || true
+
+      - name: Run spike
+        run: python pipeline/spike_reachability.py --out spike_out/github --chains "${{ inputs.chains }}"
+
+      - name: Job summary
+        if: always()
+        run: cat spike_out/github/report.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spike-report-github
+          path: |
+            spike_out/github/report.json
+            spike_out/github/report.md

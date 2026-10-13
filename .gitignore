@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+spike_out/
+dumps/
+dist/
+node_modules/
+*_cookies.txt
+logging.log
