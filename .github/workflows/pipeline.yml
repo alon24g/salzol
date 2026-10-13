@@ -39,17 +39,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Latest successful fetch-israel run younger than 48h (spec §9); otherwise those
-          # chains are reported as missing in meta.json instead of blocking the deploy.
-          run=$(gh run list --workflow fetch-israel.yml --status success --limit 1 \
-                 --json databaseId,createdAt \
-                 --jq '.[] | select((now - (.createdAt | fromdateiso8601)) < 172800) | .databaseId')
-          if [ -n "$run" ]; then
-            gh run download "$run" --name raw-israel --dir raw-il
-            cp -r raw-il/*/ raw/   # chain folders only; both sides have a fetch_status.json
-            echo "Using fetch-israel run $run: $(ls raw-il | tr '\n' ' ')" >> "$GITHUB_STEP_SUMMARY"
+          # Newest successful fetch-israel run from the last 48h (spec §9) whose artifact really
+          # contains PriceFull files: a run just after midnight can legitimately find nothing
+          # (laibcatalog lists only today's files) and must not replace the previous good data.
+          runs=$(gh run list --workflow fetch-israel.yml --status success --limit 20 \
+                  --json databaseId,createdAt \
+                  --jq '.[] | select((now - (.createdAt | fromdateiso8601)) < 172800) | .databaseId')
+          used=""
+          for run in $runs; do
+            rm -rf raw-il
+            gh run download "$run" --name raw-israel --dir raw-il 2>/dev/null || continue
+            if [ -n "$(find raw-il -path '*/price_full/*' -type f -print -quit)" ]; then
+              cp -r raw-il/*/ raw/   # chain folders only; both sides have a fetch_status.json
+              used=$run
+              break
+            fi
+            echo "fetch-israel run $run has no price files, trying an older one"
+          done
+          if [ -n "$used" ]; then
+            echo "Using fetch-israel run $used: $(ls raw-il | tr '\n' ' ')" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "::warning::No fetch-israel artifact from the last 48h; Israel-only chains will be missing"
+            echo "::warning::No usable fetch-israel artifact from the last 48h; Israel-only chains will be missing"
           fi
 
       - name: Build data

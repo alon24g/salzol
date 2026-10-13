@@ -133,6 +133,12 @@ def main() -> None:
     ap.add_argument("--out", default="raw")
     ap.add_argument("--chains", required=True, help="comma-separated ScraperFactory names")
     ap.add_argument("--kinds", default="stores,price_full", help=f"subset of {list(FILE_TYPES)}")
+    ap.add_argument(
+        "--require-prices",
+        action="store_true",
+        help="exit 1 if any chain ends up with no PriceFull files (e.g. fetched after midnight, "
+        "before the chain published today's files), so the run isn't mistaken for good data",
+    )
     args = ap.parse_args()
 
     out_root = Path(args.out)
@@ -144,6 +150,9 @@ def main() -> None:
     (out_root / "fetch_status.json").write_text(
         json.dumps(results, ensure_ascii=False, indent=2), "utf-8"
     )
+    empty = [r["chain"] for r in results if r.get("price_full", {}).get("files_on_disk", 0) == 0]
+    if args.require_prices and empty:
+        sys.exit(f"no PriceFull files for: {', '.join(empty)}")
 
 
 if __name__ == "__main__":
