@@ -5,9 +5,9 @@ import { test as base } from '@playwright/test'
 export const SNAPSHOT_NOW = new Date('2026-10-13T10:00:00')
 
 export const test = base.extend({
-  page: async ({ page }, use) => {
+  page: async ({ page }, runTest) => {
     await page.clock.setFixedTime(SNAPSHOT_NOW)
-    await use(page)
+    await runTest(page)
   },
 })
 
