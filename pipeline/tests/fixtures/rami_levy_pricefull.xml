@@ -1,0 +1,160 @@
+﻿<Root>
+  <ChainID>7290058140886</ChainID>
+  <SubChainID>001</SubChainID>
+  <StoreID>001</StoreID>
+  <BikoretNo>4</BikoretNo>
+  <Items>
+    <Item>
+      <PriceUpdateTime>2026-04-26T13:41:40.000</PriceUpdateTime>
+      <ItemCode>7290004658960</ItemCode>
+      <LastSaleDateTime>2026-09-30T14:29:31.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>יין אמרלד ריזלינג פר</ItemName>
+      <ManufactureName>כרמל מזרחי</ManufactureName>
+      <ManufactureCountry>ישראל</ManufactureCountry>
+      <ManufactureItemDescription>יין אמרלד ריזלינג פר</ManufactureItemDescription>
+      <UnitQty>לא ידוע</UnitQty>
+      <Quantity>750.00</Quantity>
+      <UnitOfMeasure>100 מיליליטר</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>49.90</ItemPrice>
+      <UnitOfMeasurePrice>0.07</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2025-04-22T07:07:20.000</PriceUpdateTime>
+      <ItemCode>7290018677490</ItemCode>
+      <LastSaleDateTime>2026-09-10T17:41:01.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>פירורי פנקו אורגני ל</ItemName>
+      <ManufactureName>לא ידוע</ManufactureName>
+      <ManufactureCountry>לא ידוע</ManufactureCountry>
+      <ManufactureItemDescription>פירורי פנקו אורגני ל</ManufactureItemDescription>
+      <UnitQty>לא ידוע</UnitQty>
+      <Quantity>200.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>18.90</ItemPrice>
+      <UnitOfMeasurePrice>0.09</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2026-04-07T14:43:45.000</PriceUpdateTime>
+      <ItemCode>7290112965288</ItemCode>
+      <LastSaleDateTime>2026-10-11T20:08:02.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>זוג מרק נמס ירקות בד</ItemName>
+      <ManufactureName>אסם</ManufactureName>
+      <ManufactureCountry>ישראל</ManufactureCountry>
+      <ManufactureItemDescription>זוג מרק נמס ירקות בד</ManufactureItemDescription>
+      <UnitQty>לא ידוע</UnitQty>
+      <Quantity>30.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>5.50</ItemPrice>
+      <UnitOfMeasurePrice>0.18</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2026-04-07T14:31:53.000</PriceUpdateTime>
+      <ItemCode>7290011473921</ItemCode>
+      <LastSaleDateTime>2026-10-12T08:45:53.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>סוביןש.שועלט500</ItemName>
+      <ManufactureName>תבואות</ManufactureName>
+      <ManufactureCountry>אנגליה</ManufactureCountry>
+      <ManufactureItemDescription>סוביןש.שועלט500</ManufactureItemDescription>
+      <UnitQty>לא ידוע</UnitQty>
+      <Quantity>500.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>12.10</ItemPrice>
+      <UnitOfMeasurePrice>0.02</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2025-02-18T15:52:42.000</PriceUpdateTime>
+      <ItemCode>7290018471913</ItemCode>
+      <LastSaleDateTime>2026-10-12T17:59:39.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>משקה מוגז בטעם פירות</ItemName>
+      <ManufactureName>יפאורה</ManufactureName>
+      <ManufactureCountry>ישראל</ManufactureCountry>
+      <ManufactureItemDescription>משקה מוגז בטעם פירות</ManufactureItemDescription>
+      <UnitQty>לא ידוע</UnitQty>
+      <Quantity>1.50</Quantity>
+      <UnitOfMeasure>ליטר</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>7.20</ItemPrice>
+      <UnitOfMeasurePrice>4.80</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2026-04-07T14:43:44.000</PriceUpdateTime>
+      <ItemCode>7290112965165</ItemCode>
+      <LastSaleDateTime>2026-09-16T13:40:18.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>זוג מרק נמס פטריות ב</ItemName>
+      <ManufactureName>אסם</ManufactureName>
+      <ManufactureCountry>ישראל</ManufactureCountry>
+      <ManufactureItemDescription>זוג מרק נמס פטריות ב</ManufactureItemDescription>
+      <UnitQty>לא ידוע</UnitQty>
+      <Quantity>30.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>5.50</ItemPrice>
+      <UnitOfMeasurePrice>0.18</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2025-11-02T10:37:14.000</PriceUpdateTime>
+      <ItemCode>7290002370628</ItemCode>
+      <LastSaleDateTime>2026-10-09T15:16:05.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>גבינת קשקבל רמי לוי</ItemName>
+      <ManufactureName>לא ידוע</ManufactureName>
+      <ManufactureCountry>ספרד</ManufactureCountry>
+      <ManufactureItemDescription>גבינת קשקבל רמי לוי</ManufactureItemDescription>
+      <UnitQty>קילוגרם</UnitQty>
+      <Quantity>1.00</Quantity>
+      <UnitOfMeasure>קילוגרם </UnitOfMeasure>
+      <bIsWeighted>1</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>105.00</ItemPrice>
+      <UnitOfMeasurePrice>105.00</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2025-09-29T12:27:18.000</PriceUpdateTime>
+      <ItemCode>7290000000453</ItemCode>
+      <LastSaleDateTime>2026-10-08T20:48:42.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>תפוח עץ לוליפופ</ItemName>
+      <ManufactureName>לא ידוע</ManufactureName>
+      <ManufactureCountry>לא ידוע</ManufactureCountry>
+      <ManufactureItemDescription>תפוח עץ לוליפופ</ManufactureItemDescription>
+      <UnitQty>קילוגרם</UnitQty>
+      <Quantity>1.00</Quantity>
+      <UnitOfMeasure>קילוגרם </UnitOfMeasure>
+      <bIsWeighted>1</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>12.90</ItemPrice>
+      <UnitOfMeasurePrice>12.90</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    </Items>
+</Root>

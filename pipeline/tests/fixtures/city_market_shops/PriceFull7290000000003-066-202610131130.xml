@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <ChainId/>
+  <SubChainId/>
+  <StoreId/>
+  <BikoretNo/>
+  <Items>
+    <Item>
+      <PriceUpdateDate>2026-10-13 10:37:56</PriceUpdateDate>
+      <ItemCode>7290108352672</ItemCode>
+      <ItemType>0</ItemType>
+      <ItemNm>זוג מטליות מיקרופייבר לריצפה סנו</ItemNm>
+      <ManufacturerName>לא ידוע</ManufacturerName>
+      <ManufactureCountry>לא ידוע</ManufactureCountry>
+      <ManufacturerItemDescription>לא ידוע</ManufacturerItemDescription>
+      <UnitQty>מארז</UnitQty>
+      <Quantity>1</Quantity>
+      <UnitOfMeasure>מארז</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>1</QtyInPackage>
+      <ItemPrice/>
+      <UnitOfMeasurePrice/>
+      <AllowDiscount/>
+      <ItemStatus>1</ItemStatus>
+    </Item>
+  </Items>
+</root>
