@@ -45,8 +45,9 @@ jobs:
                  --json databaseId,createdAt \
                  --jq '.[] | select((now - (.createdAt | fromdateiso8601)) < 172800) | .databaseId')
           if [ -n "$run" ]; then
-            gh run download "$run" --name raw-israel --dir raw
-            echo "Using fetch-israel run $run" >> "$GITHUB_STEP_SUMMARY"
+            gh run download "$run" --name raw-israel --dir raw-il
+            cp -r raw-il/*/ raw/   # chain folders only; both sides have a fetch_status.json
+            echo "Using fetch-israel run $run: $(ls raw-il | tr '\n' ' ')" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "::warning::No fetch-israel artifact from the last 48h; Israel-only chains will be missing"
           fi
