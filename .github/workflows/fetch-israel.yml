@@ -32,13 +32,13 @@ jobs:
 
       # The runner is a Windows PC with Python 3.13 installed (py launcher).
       - name: Python env
-        shell: pwsh
+        shell: powershell
         run: |
           py -3.13 -m venv .venv
           .\.venv\Scripts\python -m pip install -q -r requirements.txt
 
       - name: Fetch
-        shell: pwsh
+        shell: powershell
         run: .\.venv\Scripts\python -m pipeline.fetch --out raw-il --chains $env:ISRAEL_CHAINS --kinds stores,price_full
 
       - uses: actions/upload-artifact@v4
