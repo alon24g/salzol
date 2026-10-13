@@ -1,0 +1,49 @@
+name: Fetch (Israel runner)
+
+# Chains whose portals block non-Israeli IPs (docs/m0-reachability.md) are fetched on the
+# self-hosted runner at home and handed to pipeline.yml as an artifact.
+#
+# SECURITY: this is the only workflow allowed on the self-hosted runner. It must never be
+# triggered by pull_request / pull_request_target / issue_comment: the repo is public and
+# fork code must not run on the home PC.
+
+on:
+  schedule:
+    - cron: "0 4,10,16 * * *" # 30 min before pipeline.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fetch-israel
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    if: github.repository == 'alon24g/salzol'
+    runs-on: [self-hosted, israel]
+    timeout-minutes: 90
+    env:
+      PYTHONUTF8: "1"
+      ISRAEL_CHAINS: VICTORY_NEW_SOURCE
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner is a Windows PC with Python 3.13 installed (py launcher).
+      - name: Python env
+        shell: pwsh
+        run: |
+          py -3.13 -m venv .venv
+          .\.venv\Scripts\python -m pip install -q -r requirements.txt
+
+      - name: Fetch
+        shell: pwsh
+        run: .\.venv\Scripts\python -m pipeline.fetch --out raw-il --chains $env:ISRAEL_CHAINS --kinds stores,price_full
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw-israel
+          path: raw-il/
+          retention-days: 3
+          if-no-files-found: error

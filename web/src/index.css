@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Heebo", system-ui, sans-serif;
+}
+
+html {
+  background: var(--color-stone-50);
+  color: var(--color-stone-900);
+}

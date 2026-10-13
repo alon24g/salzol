@@ -1,0 +1,93 @@
+name: Pipeline (fetch → build → deploy)
+
+on:
+  schedule:
+    - cron: "30 4,10,16 * * *" # 07:30 / 13:30 / 19:30 Israel (summer time)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read # download the Israel runner's artifact
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+env:
+  CLOUD_CHAINS: SHUFERSAL,RAMI_LEVY
+  PYTHONUTF8: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Fetch reachable chains
+        run: python -m pipeline.fetch --out raw --chains "$CLOUD_CHAINS" --kinds stores,price_full
+
+      - name: Add Israel runner data (if fresh)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Latest successful fetch-israel run younger than 48h (spec §9); otherwise those
+          # chains are reported as missing in meta.json instead of blocking the deploy.
+          run=$(gh run list --workflow fetch-israel.yml --status success --limit 1 \
+                 --json databaseId,createdAt \
+                 --jq '.[] | select((now - (.createdAt | fromdateiso8601)) < 172800) | .databaseId')
+          if [ -n "$run" ]; then
+            gh run download "$run" --name raw-israel --dir raw
+            echo "Using fetch-israel run $run" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::No fetch-israel artifact from the last 48h; Israel-only chains will be missing"
+          fi
+
+      - name: Build data
+        run: python -m pipeline.build --raw raw --out dist/data
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build site
+        working-directory: web
+        run: |
+          npm ci
+          npx vitest run
+          npm run build
+          cp -r ../dist/data dist/data
+
+      - name: Summary
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          m = json.load(open("dist/data/meta.json", encoding="utf-8"))
+          print("| chain | ok | stores | rows | updated |\n|---|---|---|---|---|")
+          for c in m["chains"].values():
+              print(f"| {c['slug']} | {'✅' if c['ok'] else '❌ ' + c.get('error', '')} | {c.get('stores', '')} | {c.get('rows', '')} | {c.get('updated', '')} |")
+          print(f"\n{m['counts']}\n\n{m['sizes']}")
+          EOF
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

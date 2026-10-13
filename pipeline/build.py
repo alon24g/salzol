@@ -216,6 +216,8 @@ def build(raw: Path, out: Path) -> dict:
                 "p": [[p, sorted(st)] for p, st in sorted(pr.items())],
             }
         shards[int(bc) % PRICE_SHARDS][bc] = {
+            "n": name,  # so a product page deep link doesn't need search.json
+            "b": brand,
             "w": agg.weighted.most_common(1)[0][0],
             "size": list(size) if size else None,
             "c": per_chain,
