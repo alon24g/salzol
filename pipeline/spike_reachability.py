@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import gzip
+import io
 import json
 import os
 import platform
@@ -22,6 +24,7 @@ import sys
 import time
 import traceback
 import types
+import zipfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +40,7 @@ if sys.platform == "win32":
     sys.modules["fcntl"] = _fcntl
 
 from il_supermarket_scarper import FileTypesFilters, ScraperFactory
+from il_supermarket_scarper.engines import Bina
 from il_supermarket_scarper.utils.file_output import DiskFileOutput
 
 PER_FILE_TYPE_TIMEOUT_S = 240
@@ -61,11 +65,16 @@ def sniff_encoding(raw: bytes) -> str:
 def inspect_xml(path: Path) -> dict:
     """Describe a downloaded file without assuming its schema."""
     raw = path.read_bytes()
-    info: dict = {
-        "file": path.name,
-        "bytes": len(raw),
-        "encoding": sniff_encoding(raw),
-    }
+    info: dict = {"file": path.name, "bytes_on_disk": len(raw), "container": "plain"}
+    # Detect compression by content: e.g. Bina serves ".GZ" (upper case), which the
+    # scraper doesn't recognise, so it saves raw gzip with no extension.
+    if raw[:2] == b"\x1f\x8b":
+        raw, info["container"] = gzip.decompress(raw), "gzip"
+    elif raw[:4] == b"PK\x03\x04":
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            raw, info["container"] = zf.read(zf.namelist()[0]), "zip"
+    info["bytes"] = len(raw)
+    info["encoding"] = sniff_encoding(raw)
     try:
         root = etree.fromstring(raw, parser=etree.XMLParser(recover=True, huge_tree=True))
     except Exception as e:  # noqa: BLE001 - spike: record anything
@@ -101,6 +110,10 @@ async def fetch_one(scraper_enum: ScraperFactory, file_type: str, out_dir: Path)
     target.mkdir(parents=True, exist_ok=True)
     scraper_cls = scraper_enum.value
     scraper = scraper_cls(file_output=DiskFileOutput(storage_path=str(target)))
+    if isinstance(scraper, Bina) and scraper.url.startswith("http://"):
+        # binaprojects.com now 302-redirects http→https and the scraper's listing
+        # call doesn't follow it, so every Bina chain silently lists 0 files (v1.0.8).
+        scraper.url = "https://" + scraper.url[len("http://"):]
 
     started = time.monotonic()
     results = []
@@ -118,7 +131,7 @@ async def fetch_one(scraper_enum: ScraperFactory, file_type: str, out_dir: Path)
         error = f"{type(e).__name__}: {e}"
         traceback.print_exc()
 
-    files = [p for p in target.iterdir() if p.is_file() and p.suffix.lower() == ".xml"]
+    files = [p for p in target.iterdir() if p.is_file()]
     entry: dict = {
         "seconds": round(time.monotonic() - started, 1),
         "results": [
@@ -176,7 +189,7 @@ def to_markdown(report: dict) -> str:
         lines.append(
             f"| {name} | {'✅' if s['ok'] else '❌'} | {'✅' if p['ok'] else '❌'} | "
             f"{fmt_size(pi.get('bytes'))} | {pi.get('record_count', '-')} | "
-            f"{pi.get('encoding', '-')} | {str(err)[:80].replace('|', '/')} |"
+            f"{pi.get('container', '-')} / {pi.get('encoding', '-')} | {str(err)[:80].replace('|', '/')} |"
         )
     lines += ["", "## Field names (PriceFull record / Stores record)", ""]
     for name, r in report["chains"].items():
