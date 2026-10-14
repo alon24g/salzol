@@ -50,6 +50,37 @@ NAME_ALIASES = {
     # Rami Levy publishes City=0 for these; the store name is a regional landmark.
     "שער בנימין": "כוכב יעקב",
     "גוש עציון": "אלון שבות",
+    # M5 chains: City=0/unknown with the place only in the store name or address.
+    "ת\"א": "תל אביב -יפו",  # quotes are stripped by norm_name: matches ת"א / תא
+    "ראשל\"צ": "ראשון לציון",
+    "ראש\"לצ": "ראשון לציון",
+    "פ\"ת": "פתח תקווה",
+    "כ\"ס": "כפר סבא",
+    "ב\"ש": "באר שבע",
+    "נהריה": "נהרייה",
+    "יקנעם": "יקנעם עילית",
+    "יוקנעם": "יקנעם עילית",
+    "פרדס חנה": "פרדס חנה-כרכור",
+    "כרכור": "פרדס חנה-כרכור",
+    "סכנין": "סח'נין",
+    "דיר חנא": "דייר חנא",
+    "אשדות יעקב": "אשדות יעקב (מאוחד)",
+    "מיתרים": "מיתר",
+    "רמת אפעל": "רמת גן",
+    "מישור אדומים": "מעלה אדומים",
+    "עקרון": "מזכרת בתיה",
+    "צומת בילו": "קריית עקרון",
+    # Neighborhoods / shopping centers used as the store name.
+    "יד אליהו": "תל אביב -יפו",
+    "רמת אליהו": "ראשון לציון",
+    "חוצות המפרץ": "חיפה",
+    "קרית חיים": "חיפה",
+    "גבעת רם": "ירושלים",
+    "פולג": "נתניה",
+    "מעלות": "מעלות-תרשיחא",
+    "חצור": "חצור הגלילית",
+    "טלזסטון": "קריית יערים",
+    "יהוד": "יהוד-מונוסון",
 }
 
 
@@ -92,7 +123,7 @@ class Settlements:
 
     def _find_in_text(self, text: str) -> dict | None:
         # Longest settlement name that appears as a whole word sequence in the text.
-        words = re.split(r"[\s,\-()]+", text.translate(_FINALS))
+        words = re.split(r"[\s,\-()*]+", text.translate(_FINALS))  # Super Sapir: "בת ים*"
         best = None
         for i in range(len(words)):
             for j in range(min(len(words), i + 4), i, -1):

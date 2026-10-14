@@ -44,12 +44,17 @@ export type ChainMeta = {
   updated: string // Israel local time, "YYYY-MM-DDTHH:mm"
   stores?: number
   error?: string
+  price_files?: number
+  stale_files?: string[] // stores whose newest price file is > 48 h older than the chain's newest
+  promos?: number
+  promo_error?: string
 }
 
 export type Meta = {
   built_at: string
   chains: Record<string, ChainMeta>
   promo_date_window?: [string, string] // shopping dates the promo data covers
+  price_shards?: number // prices/<barcode % price_shards>.json; absent = 256
 }
 
 /** cities.json row: [name, lat, lon] */

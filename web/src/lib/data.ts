@@ -1,8 +1,9 @@
 import type { Promo } from './promos'
 import type { CityRow, ItemPrices, Meta, PriceShard, SearchRow, StoresByChain } from './types'
 
-// Must match PRICE_SHARDS / PROMO_CHUNK in pipeline/build.py.
-export const PRICE_SHARDS = 256
+// Must match PROMO_CHUNK in pipeline/build.py. The shard count is in meta.json (price_shards);
+// data built before it was added used 256.
+const DEFAULT_PRICE_SHARDS = 256
 export const PROMO_CHUNK = 500
 
 const DATA = `${import.meta.env.BASE_URL}data/`
@@ -36,15 +37,16 @@ export function canonicalBarcode(input: string): string | null {
   return stripped.padStart(13, '0')
 }
 
-export function shardOf(barcode: string): string {
+export function shardOf(barcode: string, shards = DEFAULT_PRICE_SHARDS): string {
   // Barcodes can exceed 2^53, so take the modulo digit by digit.
   let m = 0
-  for (const d of barcode) m = (m * 10 + Number(d)) % PRICE_SHARDS
+  for (const d of barcode) m = (m * 10 + Number(d)) % shards
   return String(m).padStart(3, '0')
 }
 
 export async function loadItem(barcode: string): Promise<ItemPrices | null> {
-  const shard = await getJson<PriceShard>(`prices/${shardOf(barcode)}.json`)
+  const meta = await loadMeta()
+  const shard = await getJson<PriceShard>(`prices/${shardOf(barcode, meta.price_shards)}.json`)
   return shard[barcode] ?? null
 }
 

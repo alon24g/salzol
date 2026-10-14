@@ -4,8 +4,12 @@ Some chain portals block non-Israeli IPs (see `m0-reachability.md`). Those chain
 `.github/workflows/fetch-israel.yml` on a self-hosted runner with the label `israel`, currently the
 home PC (Windows 11, Python 3.13 via the `py` launcher). Everything else runs on GitHub-hosted runners.
 
-`pipeline.yml` never waits for this runner: it uses the newest `raw-israel` artifact if it is less
-than 48 h old, otherwise those chains are reported as missing in `meta.json`.
+Chains on this runner (M5): Victory, Hazi Hinam, H. Cohen, Mahsanei HaShuk, Super-Pharm. Without
+Victory they took ~5 minutes from home (2026-10-14; Super-Pharm alone ~4).
+
+`pipeline.yml` never waits for this runner: for each chain it uses the newest `raw-israel` artifact
+from the last 48 h that has price files for that chain; a chain with none is reported as missing in
+`meta.json` (and on the About page).
 
 ## Security
 
@@ -27,14 +31,18 @@ The repo is public. A self-hosted runner executes whatever workflow code targets
 
 ### Keep it running across reboots (pick one)
 
-1. **Windows service** (recommended; needs an *administrator* PowerShell):
+1. **Windows service** (recommended; needs an *administrator* PowerShell). The service must run as
+   the user account, not the default `NETWORK SERVICE`: Python is a per-user install under
+   `AppData`, which `NETWORK SERVICE` can't see, so `py -3.13` would fail in `fetch-israel.yml`.
    ```powershell
    cd C:\Users\USER\actions-runner-salzol
    .\config.cmd remove --token (gh api -X POST repos/alon24g/salzol/actions/runners/remove-token --jq .token)
    .\config.cmd --unattended --url https://github.com/alon24g/salzol `
      --token (gh api -X POST repos/alon24g/salzol/actions/runners/registration-token --jq .token) `
-     --name salzol-home-pc --labels israel --work _work --runasservice
+     --name salzol-home-pc --labels israel --work _work --runasservice `
+     --windowslogonaccount "$env:COMPUTERNAME\$env:USERNAME" --windowslogonpassword <password>
    ```
+   `install-service.ps1` in the runner folder does all of this and prompts for the password.
 2. **Start at logon** (no admin): put a shortcut to `C:\Users\USER\actions-runner-salzol\run.cmd`
    in `shell:startup` (Win+R → `shell:startup`).
 

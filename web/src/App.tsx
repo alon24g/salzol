@@ -1,3 +1,4 @@
+import { AboutPage } from './components/AboutPage'
 import { ComparePage } from './components/ComparePage'
 import { Footer } from './components/Footer'
 import { ListPage } from './components/ListPage'
@@ -60,6 +61,8 @@ export default function App() {
           <ListPage />
         ) : route.name === 'compare' ? (
           <ComparePage place={place} radiusKm={radiusKm} ctx={ctx} />
+        ) : route.name === 'about' ? (
+          <AboutPage />
         ) : route.name === 'share' ? (
           <SharePage data={route.data} />
         ) : (

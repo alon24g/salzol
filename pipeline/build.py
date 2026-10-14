@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import re
 import shutil
 import statistics
 import time
@@ -39,17 +40,50 @@ def known_manufacturer(name: str) -> bool:
     return bool(name) and name not in UNKNOWN_MANUFACTURERS and any(c.isalnum() for c in name)
 
 
-# ScraperFactory name → public chain slug + Hebrew display name.
+# ScraperFactory name → public chain slug + Hebrew display name. Every chain the scraper
+# supports except WOLT (online-only dark stores) and MESHMAT_YOSEF_1 (Mishnat Yosef's web
+# shop; its physical stores are MESHMAT_YOSEF_2). Slugs are public: they are stored in users'
+# club settings, so never rename one.
 CHAINS = {
     "SHUFERSAL": ("shufersal", "שופרסל"),
     "RAMI_LEVY": ("rami_levy", "רמי לוי"),
     "VICTORY_NEW_SOURCE": ("victory", "ויקטורי"),
+    "YAYNO_BITAN_AND_CARREFOUR": ("carrefour", "קרפור"),
+    "YOHANANOF": ("yohananof", "יוחננוף"),
+    "OSHER_AD": ("osher_ad", "אושר עד"),
+    "TIV_TAAM": ("tiv_taam", "טיב טעם"),
+    "HAZI_HINAM": ("hazi_hinam", "חצי חינם"),
+    "MAHSANI_ASHUK_NEW_SOURCE": ("mahsanei_hashuk", "מחסני השוק"),
+    "HET_COHEN_NEW_SOURCE": ("het_cohen", "ח. כהן"),
+    "STOP_MARKET": ("stop_market", "סטופ מרקט"),
+    "POLIZER": ("polizer", "פוליצר"),
+    "SALACH_DABACH": ("salach_dabach", "סאלח דבאח"),
+    "FRESH_MARKET_AND_SUPER_DOSH": ("fresh_market", "פרש מרקט"),
+    "SUPER_YUDA": ("super_yuda", "סופר יודה"),
+    "KESHET": ("keshet", "קשת טעמים"),
+    "KING_STORE": ("king_store", "קינג סטור"),
+    "BAREKET": ("bareket", "סופר ברקת"),
+    "MAAYAN_2000": ("maayan_2000", "מעיין 2000"),
+    "MESHMAT_YOSEF_2": ("mishnat_yosef", "משנת יוסף"),
+    "SHEFA_BARCART_ASHEM": ("shefa_birkat_hashem", "שפע ברכת השם"),
+    "SHUK_AHIR": ("shuk_hair", "שוק העיר"),
+    "SUPER_SAPIR": ("super_sapir", "סופר ספיר"),
+    "ZOL_VEBEGADOL": ("zol_vebegadol", "זול ובגדול"),
+    "CITY_MARKET_SHOPS": ("city_market", "סיטי מרקט"),
+    "CITY_MARKET_KIRYATGAT": ("city_market_kiryat_gat", "סיטי מרקט קריית גת"),
+    "NETIV_HASED": ("netiv_hased", "נתיב החסד"),
+    "DOR_ALON": ("dor_alon", "דור אלון (AM:PM)"),
+    "YELLOW": ("yellow", "יילו"),
+    "SUPER_PHARM": ("super_pharm", "סופר-פארם"),
+    "GOOD_PHARM": ("good_pharm", "גוד פארם"),
 }
 
 STALE_AFTER = timedelta(hours=48)  # spec §9
 PROMO_LOOKAHEAD = timedelta(days=14)  # furthest shopping date the UI offers
 PROMO_CHUNK = 500  # promos per file in promos/<chain>/
-PRICE_SHARDS = 256  # barcode → shard by int(barcode) % PRICE_SHARDS
+# barcode → prices/<int(barcode) % PRICE_SHARDS>.json. Written to meta.json (the web app reads it
+# there). 1024 keeps a shard ~110 KB (~20 KB gzipped) with all chains.
+PRICE_SHARDS = 1024
 OUTLIER_FACTOR = 5.0  # a chain's price this far from the cross-chain median is invalid
 
 
@@ -67,6 +101,39 @@ def store_key(sid: str) -> str:
     """'001' and '1' are the same store (price headers pad, Stores files often don't)."""
     s = sid.strip()
     return str(int(s)) if s.isdigit() else s
+
+
+_NAME_STORE = re.compile(r"^(?:price|promo)(?:full)?\d+-(?:\d+-)?(\d+)-\d{8}", re.I)
+
+
+_WORD = re.compile(r"\w+")
+
+
+def alias_words(name: str, aliases: list[str]) -> list[str]:
+    """Other chains' names for an item, reduced to the words the canonical name lacks.
+
+    The web app only uses aliases to match search terms (never shows them), and with 30
+    chains most aliases repeat the canonical name: keeping only new words halves search.json.
+    Returns [] or a single space-joined string, in first-seen order."""
+    seen = set(_WORD.findall(name.lower()))
+    new: list[str] = []
+    for a in aliases:
+        for w in _WORD.findall(a.lower()):
+            if w not in seen:
+                seen.add(w)
+                new.append(w)
+    return [" ".join(new)] if new else []
+
+
+def file_store_key(file_name: str, in_file_id: str, known: dict) -> str:
+    """Store key for a price/promo file. Normally the StoreId inside the file; some chains
+    (Carrefour: file -400-, StoreId 103) disagree with their own Stores file, in which case
+    the store number in the file name is the one the Stores file knows."""
+    k = store_key(in_file_id)
+    if k in known:
+        return k
+    m = _NAME_STORE.match(file_name)
+    return store_key(m[1]) if m and store_key(m[1]) in known else k
 
 
 def stamp_to_dt(stamp: str) -> datetime | None:
@@ -127,7 +194,7 @@ def collect_promos(folder: Path, slug: str, idx_of: dict[str, int | None], info:
         except Exception as e:  # noqa: BLE001
             info.setdefault("promo_file_errors", []).append(f"{p.name}: {e}")
             continue
-        sidx = idx_of.get(store_key(store_id))
+        sidx = idx_of.get(file_store_key(p.name, store_id, idx_of))
         if sidx is None:  # unknown or excluded (Eilat) store
             continue
         for pr in promos:
@@ -236,7 +303,7 @@ def build(raw: Path, out: Path) -> dict:
                 info.setdefault("file_errors", []).append(f"{p.name}: {e}")
                 continue
             newest_stamp = max(newest_stamp, file_key_and_stamp(p.name)[1])
-            k = store_key(pf.store_id)
+            k = file_store_key(p.name, pf.store_id, idx_of)
             if k not in idx_of:  # price file for a store missing from the Stores file
                 idx_of[k] = len(stores_out[slug])
                 stores_out[slug].append({"id": k, "name": "", "city": "", "address": "", "lat": None, "lon": None})
@@ -344,7 +411,7 @@ def build(raw: Path, out: Path) -> dict:
         # Canonical name: used by the most chains (not stores: Rami Levy truncates names to
         # 20 chars and would win a per-store vote); ties → longest, i.e. least truncated.
         name = max(agg.names.items(), key=lambda kv: (len(kv[1]), len(kv[0])))[0] if agg.names else bc
-        aliases = [n for n in agg.names if n != name]
+        aliases = alias_words(name, [n for n in agg.names if n != name])
         size = agg.unit.most_common(1)[0][0] if agg.unit else None
         brand = agg.manufacturers.most_common(1)[0][0] if agg.manufacturers else ""
         entry = [bc, name, brand, len(agg.prices)]
@@ -411,6 +478,7 @@ def build(raw: Path, out: Path) -> dict:
             "promo_kinds": dict(Counter(d["kind"] for p in promos_out.values() for d in p)),
             "promo_checks": dict(promo_checks),
         },
+        "price_shards": PRICE_SHARDS,
         "promo_date_window": [israel_today().isoformat(), (israel_today() + PROMO_LOOKAHEAD).isoformat()],
         "build_seconds": round(time.monotonic() - t0, 1),
     }

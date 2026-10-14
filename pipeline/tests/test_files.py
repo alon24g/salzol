@@ -2,7 +2,7 @@
 
 import pytest
 
-from pipeline.build import latest_files, store_key
+from pipeline.build import file_store_key, latest_files, store_key
 from pipeline.fetch import file_key_and_stamp
 
 
@@ -37,3 +37,13 @@ def test_latest_files_keeps_newest_and_drops_stale(tmp_path):
 def test_store_key_unpads():
     assert store_key("001") == store_key("1") == "1"
     assert store_key("A12") == "A12"
+
+
+def test_file_store_key_prefers_in_file_id_and_falls_back_to_file_name():
+    known = {"400": 0, "1": 1}
+    # Carrefour: file name says store 400 (as in its Stores file), the file itself says 103.
+    assert file_store_key("PriceFull7290055700007-001-400-20261014-051000.gz", "103", known) == "400"
+    assert file_store_key("PromoFull7290055700007-001-400-20261014-051000.gz", "103", known) == "400"
+    assert file_store_key("PriceFull7290027600007-001-001-20261013-030000.xml", "001", known) == "1"
+    # Neither known: keep the in-file id (build.py adds it as an unnamed store).
+    assert file_store_key("PriceFull7290055700007-001-999-20261014-051000.gz", "77", known) == "77"

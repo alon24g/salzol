@@ -1,0 +1,96 @@
+﻿<Root>
+    <ChainId>7290000000003</ChainId>
+    <SubChainId>001</SubChainId>
+    <StoreId>013</StoreId>
+    <BikoretNo>4</BikoretNo>
+    <Promotions Count="690">
+        <Promotion>
+            <PromotionId>23</PromotionId>
+            <PromotionDescription>מבצע בוטנים סבבה4ב-10</PromotionDescription>
+            <PromotionUpdateDate>2021-03-03 10:30</PromotionUpdateDate>
+            <PromotionStartDate>2019-03-05</PromotionStartDate>
+            <PromotionStartHour>00:00:00</PromotionStartHour>
+            <PromotionEndDate>2027-12-31</PromotionEndDate>
+            <PromotionEndHour>23:59:59</PromotionEndHour>
+            <RewardType>10</RewardType>
+            <AllowMultipleDiscounts>1</AllowMultipleDiscounts>
+            <IsWeightedPromo>0</IsWeightedPromo>
+            <AdditionalRestrictions>
+                <AdditionalIsCoupon>0</AdditionalIsCoupon>
+                <AdditionalGiftCount/>
+                <AdditionalIsActive>1</AdditionalIsActive>
+            </AdditionalRestrictions>
+            <MinQty>4</MinQty>
+            <MaxQty>0</MaxQty>
+            <MinPurchaseAmount>0</MinPurchaseAmount>
+            <DiscountType>1</DiscountType>
+            <DiscountedPrice>10.00</DiscountedPrice>
+            <DiscountedPricePerMida>2.50</DiscountedPricePerMida>
+            <MinNoOfItemOfered>0</MinNoOfItemOfered>
+            <PromotionItems Count="2">
+                <Item>
+                    <ItemCode>7290010117970</ItemCode>
+                    <ItemType>1</ItemType>
+                    <IsGiftItem>1</IsGiftItem>
+                </Item>
+                <Item>
+                    <ItemCode>7290106653504</ItemCode>
+                    <ItemType>1</ItemType>
+                    <IsGiftItem>1</IsGiftItem>
+                </Item>
+            </PromotionItems>
+            <Clubs>
+                <ClubId>0</ClubId>
+            </Clubs>
+        </Promotion>
+        <Promotion>
+            <PromotionId>584</PromotionId>
+            <PromotionDescription>בדין מרכך 960 14.9 05/10/26 03/11/26</PromotionDescription>
+            <PromotionUpdateDate>2026-09-30 20:44</PromotionUpdateDate>
+            <PromotionStartDate>2026-10-05</PromotionStartDate>
+            <PromotionStartHour>00:00:00</PromotionStartHour>
+            <PromotionEndDate>2026-11-03</PromotionEndDate>
+            <PromotionEndHour>23:59:59</PromotionEndHour>
+            <RewardType>1</RewardType>
+            <AllowMultipleDiscounts>1</AllowMultipleDiscounts>
+            <IsWeightedPromo>0</IsWeightedPromo>
+            <AdditionalRestrictions>
+                <AdditionalIsCoupon>0</AdditionalIsCoupon>
+                <AdditionalGiftCount/>
+                <AdditionalIsActive>1</AdditionalIsActive>
+            </AdditionalRestrictions>
+            <MinQty>1</MinQty>
+            <MaxQty>0</MaxQty>
+            <MinPurchaseAmount>0</MinPurchaseAmount>
+            <DiscountType>1</DiscountType>
+            <DiscountedPrice>14.90</DiscountedPrice>
+            <DiscountedPricePerMida>14.90</DiscountedPricePerMida>
+            <MinNoOfItemOfered>0</MinNoOfItemOfered>
+            <PromotionItems Count="4">
+                <Item>
+                    <ItemCode>7290116536279</ItemCode>
+                    <ItemType>1</ItemType>
+                    <IsGiftItem>1</IsGiftItem>
+                </Item>
+                <Item>
+                    <ItemCode>7290116536316</ItemCode>
+                    <ItemType>1</ItemType>
+                    <IsGiftItem>1</IsGiftItem>
+                </Item>
+                <Item>
+                    <ItemCode>7290116536323</ItemCode>
+                    <ItemType>1</ItemType>
+                    <IsGiftItem>1</IsGiftItem>
+                </Item>
+                <Item>
+                    <ItemCode>7290116536347</ItemCode>
+                    <ItemType>1</ItemType>
+                    <IsGiftItem>1</IsGiftItem>
+                </Item>
+            </PromotionItems>
+            <Clubs>
+                <ClubId>0</ClubId>
+            </Clubs>
+        </Promotion>
+        </Promotions>
+</Root>

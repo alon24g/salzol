@@ -70,3 +70,12 @@ def test_known_manufacturer(name, expected):
     from pipeline.build import known_manufacturer
 
     assert known_manufacturer(name) is expected
+
+
+def test_alias_words_keeps_only_words_the_canonical_name_lacks():
+    from pipeline.build import alias_words
+
+    name = "חלב תנובה 3% שומן 2 ליטר"
+    aliases = ["חלב תנובה 3% 2 ל", "חלב טרי 3% תנובה בקרטון", "חלב תנובה 3% שומן 2 ליטר"]
+    assert alias_words(name, aliases) == ["ל טרי בקרטון"]
+    assert alias_words("במבה", ["במבה"]) == []

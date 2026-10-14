@@ -197,3 +197,34 @@ def test_to_json_keeps_zero_min_qty():
     p = find(promos("rami_levy", "rami_levy")[1], "קשתית בקר")
     d = to_json(p)
     assert d["min_qty"] == 0 and "club_only" not in d and "get_qty" not in d
+
+
+# --- Bina portal (Bareket, King Store, Maayan 2000, …): group ids are zero-padded --------
+
+
+def test_bina_padded_group_id_is_the_deal_group():
+    store, ps = promos("bareket", "bareket")
+    p = find(ps, "מעדן דנונה ביו סויה-5ב20")  # regular 5.90 each
+    assert store == "009"
+    assert (p.kind, p.value, p.min_qty) == ("n_for_price", 20.0, 5)
+    assert p.applicable and not p.club_only
+    assert "7290119371822" in p.items
+
+
+# --- City Market: flat layout (deal fields on the Promotion, items as <Item>) ------------
+
+
+def test_flat_layout_n_for_price():
+    store, ps = promos("city_market", "city_market")
+    p = find(ps, "סבבה4ב-10")  # regular 2.90 each
+    assert store == "013"
+    assert (p.kind, p.value, p.min_qty) == ("n_for_price", 10.0, 4)
+    assert {"7290010117970", "7290106653504"} <= set(p.items)
+
+
+def test_flat_layout_dates_and_fixed_price():
+    p = find(promos("city_market", "city_market")[1], "בדין מרכך 960")  # regular 18.90
+    assert (p.kind, p.value) == ("fixed_price", 14.9)
+    # PromotionStartDate + PromotionStartHour, PromotionEndDate + PromotionEndHour
+    assert (p.start, p.end) == ("2026-10-05T00:00", "2026-11-03T23:59")
+    assert not p.is_coupon and not p.club_only

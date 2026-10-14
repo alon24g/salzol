@@ -16,13 +16,51 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CLOUD_CHAINS: SHUFERSAL,RAMI_LEVY
   PYTHONUTF8: "1"
 
 jobs:
-  build:
+  # Chains reachable from GitHub (docs/m0-reachability.md), fetched in parallel. Groups follow
+  # the hosting portal so no portal gets more than one job's worth of concurrent downloads.
+  # The geo-blocked chains come from fetch-israel.yml. Keep in sync with CHAINS in build.py.
+  fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: shufersal
+            chains: SHUFERSAL
+          - group: cerberus-a
+            chains: RAMI_LEVY,YOHANANOF,TIV_TAAM,OSHER_AD,POLIZER,STOP_MARKET
+          - group: cerberus-b
+            chains: SALACH_DABACH,FRESH_MARKET_AND_SUPER_DOSH,SUPER_YUDA,KESHET,YELLOW,DOR_ALON
+          - group: bina
+            chains: BAREKET,KING_STORE,MAAYAN_2000,MESHMAT_YOSEF_2,SHEFA_BARCART_ASHEM,SHUK_AHIR,SUPER_SAPIR,ZOL_VEBEGADOL,GOOD_PHARM,CITY_MARKET_KIRYATGAT
+          - group: other
+            chains: YAYNO_BITAN_AND_CARREFOUR,CITY_MARKET_SHOPS,NETIV_HASED
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Fetch ${{ matrix.group }}
+        run: python -m pipeline.fetch --out raw --chains "${{ matrix.chains }}" --kinds stores,price_full,promo_full
+      - run: mv raw/fetch_status.json "raw/fetch_status-${{ matrix.group }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw-cloud-${{ matrix.group }}
+          path: raw/
+          retention-days: 1
+          if-no-files-found: warn
+
+  build:
+    needs: fetch
+    if: ${{ !cancelled() }} # one failed fetch group must not stop the others from being published
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -32,34 +70,37 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
-      - name: Fetch reachable chains
-        run: python -m pipeline.fetch --out raw --chains "$CLOUD_CHAINS" --kinds stores,price_full,promo_full
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: raw-cloud-*
+          path: raw
+          merge-multiple: true
 
       - name: Add Israel runner data (if fresh)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Newest successful fetch-israel run from the last 48h (spec §9) whose artifact really
-          # contains PriceFull files: a run just after midnight can legitimately find nothing
-          # (laibcatalog lists only today's files) and must not replace the previous good data.
+          # Per chain, the newest successful fetch-israel run from the last 48h (spec §9) that
+          # really has PriceFull files for it: a run just after midnight can legitimately find
+          # nothing for a chain (laibcatalog lists only today's files), and one chain's portal
+          # being down must not drop the others.
           runs=$(gh run list --workflow fetch-israel.yml --status success --limit 20 \
                   --json databaseId,createdAt \
                   --jq '.[] | select((now - (.createdAt | fromdateiso8601)) < 172800) | .databaseId')
-          used=""
           for run in $runs; do
             rm -rf raw-il
             gh run download "$run" --name raw-israel --dir raw-il 2>/dev/null || continue
-            if [ -n "$(find raw-il -path '*/price_full/*' -type f -print -quit)" ]; then
-              cp -r raw-il/*/ raw/   # chain folders only; both sides have a fetch_status.json
-              used=$run
-              break
-            fi
-            echo "fetch-israel run $run has no price files, trying an older one"
+            for dir in raw-il/*/; do
+              chain=$(basename "$dir")
+              [ -e "raw/$chain" ] && continue
+              if [ -n "$(find "$dir" -path '*/price_full/*' -type f -print -quit)" ]; then
+                cp -r "$dir" "raw/$chain"
+                echo "Israel runner: $chain from run $run" >> "$GITHUB_STEP_SUMMARY"
+              fi
+            done
           done
-          if [ -n "$used" ]; then
-            echo "Using fetch-israel run $used: $(ls raw-il | tr '\n' ' ')" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "::warning::No usable fetch-israel artifact from the last 48h; Israel-only chains will be missing"
+          if [ -z "$runs" ]; then
+            echo "::warning::No fetch-israel run from the last 48h; Israel-only chains will be missing"
           fi
 
       - name: Build data

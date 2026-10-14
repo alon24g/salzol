@@ -108,6 +108,7 @@ describe('barcodes', () => {
   it('shard matches Python int(barcode) % 256', () => {
     // 7290116936291 % 256 == 99, computed with Python
     expect(shardOf('7290116936291')).toBe(String(7290116936291 % 256).padStart(3, '0'))
+    expect(shardOf('7290116936291', 1024)).toBe(String(7290116936291 % 1024).padStart(3, '0'))
   })
 })
 

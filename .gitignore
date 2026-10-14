@@ -9,3 +9,4 @@ node_modules/
 logging.log
 raw/
 *.log
+raw_*/

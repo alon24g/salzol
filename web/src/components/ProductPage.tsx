@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { cheapestMarks } from '../lib/basket'
 import { loadItem, loadItemPromos, loadMeta, loadStores } from '../lib/data'
 import { formatKm, formatPrice, formatUpdated } from '../lib/format'
-import { chainOffers, chainsOutOfRange, radiusToReach, unitPrice, type ChainOffer, type Place } from '../lib/nearby'
+import { chainOffers, chainsOutOfRange, RADIUS_OPTIONS, radiusToReach, unitPrice, type ChainOffer, type Place } from '../lib/nearby'
 import { chainSiteLink } from '../lib/chainSites'
 import { listsStore, useLists } from '../lib/lists'
 import { promoLabel, type Blocker, type PricingContext, type Promo } from '../lib/promos'
 import { listHref } from '../lib/router'
 import type { ItemPrices, Meta, StoresByChain } from '../lib/types'
 import { QuantityStepper } from './QuantityStepper'
+
+// With ~30 chains, show the cheapest few and let the user expand the rest.
+const CHAINS_SHOWN = 5
+const OUT_OF_RANGE_SHOWN = 3
 
 type Loaded = {
   barcode: string
@@ -25,6 +29,9 @@ export function ProductPage({ barcode, place, radiusKm, setRadius, ctx }: Props)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const [qtyFor, setQtyFor] = useState<{ barcode: string; qty: number } | null>(null)
+  // "Show all" toggles are keyed by barcode so they reset when navigating to another product.
+  const [allChainsFor, setAllChainsFor] = useState<string | null>(null)
+  const [allOutFor, setAllOutFor] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
@@ -62,7 +69,11 @@ export function ProductPage({ barcode, place, radiusKm, setRadius, ctx }: Props)
 
   const { item, meta } = data
   const best = cheapestMarks(offers.map((o) => o.cheapest.total))
-  const outOfRange = place ? chainsOutOfRange(item, data.stores, place, offers) : []
+  const outOfRange = place ? chainsOutOfRange(item, data.stores, place, offers).map((o) => ({ ...o, reach: radiusToReach(o.nearestKm) })) : []
+  // Chains only reachable beyond the largest radius are summarized in one line, not listed.
+  const reachable = outOfRange.filter((o) => o.reach != null)
+  const farChains = outOfRange.length - reachable.length
+  const shownChains = allChainsFor === barcode ? offers.length : CHAINS_SHOWN
   const chainName = (slug: string) => meta.chains[slug]?.name ?? slug
 
   return (
@@ -109,20 +120,24 @@ export function ProductPage({ barcode, place, radiusKm, setRadius, ctx }: Props)
         </p>
       ) : (
         <ol className="flex flex-col gap-3" data-testid="chain-offers">
-          {offers.map((o, i) => (
+          {offers.slice(0, shownChains).map((o, i) => (
             <ChainRow key={o.chain} offer={o} best={best[i]} item={item} barcode={barcode} meta={meta} radiusKm={place ? radiusKm : null} qty={qty} />
           ))}
         </ol>
+      )}
+      {offers.length > shownChains && (
+        <button type="button" className="btn-soft self-center" onClick={() => setAllChainsFor(barcode)} data-testid="show-all-chains">
+          הצגת כל {offers.length} הרשתות (עוד {offers.length - shownChains}, יקרות יותר)
+        </button>
       )}
 
       {offers.length > 0 && (
         <p className="text-xs text-stone-500">↗ הקישורים לאתרי הרשתות מחפשים את המוצר בחנות המקוונת; המחיר שם עשוי להיות שונה ממחיר הסניף.</p>
       )}
 
-      {outOfRange.length > 0 && (
+      {(reachable.length > 0 || farChains > 0) && (
         <ul className="flex flex-col gap-2 text-sm" data-testid="missing-chains">
-          {outOfRange.map(({ chain, nearestKm }) => {
-            const reach = radiusToReach(nearestKm)
+          {reachable.slice(0, allOutFor === barcode ? undefined : OUT_OF_RANGE_SHOWN).map(({ chain, nearestKm, reach }) => {
             return (
               <li key={chain} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-dashed border-stone-300 px-3 py-2 text-stone-600" data-testid="out-of-range" data-chain={chain}>
                 <span>
@@ -136,6 +151,19 @@ export function ProductPage({ barcode, place, radiusKm, setRadius, ctx }: Props)
               </li>
             )
           })}
+          {reachable.length > OUT_OF_RANGE_SHOWN && allOutFor !== barcode && (
+            <li>
+              <button type="button" className="link" onClick={() => setAllOutFor(barcode)} data-testid="show-all-out-of-range">
+                עוד {reachable.length - OUT_OF_RANGE_SHOWN} רשתות עם סניף קצת יותר רחוק
+              </button>
+            </li>
+          )}
+          {farChains > 0 && (
+            <li className="px-3 text-stone-500" data-testid="far-chains">
+              {farChains === 1 ? 'רשת נוספת מוכרת' : `${farChains} רשתות נוספות מוכרות`} את המוצר רק במרחק של יותר מ-
+              {RADIUS_OPTIONS[RADIUS_OPTIONS.length - 1]} ק"מ.
+            </li>
+          )}
         </ul>
       )}
     </article>

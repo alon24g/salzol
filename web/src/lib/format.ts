@@ -13,6 +13,12 @@ export function formatUpdated(s: string): string {
   return m ? `${m[3]}.${m[2]} ${m[4]}:${m[5]}` : '—'
 }
 
+/** Hours from a pipeline "updated" stamp (Israel local time, taken as UTC+3) to `now`; null if unparseable. */
+export function hoursSince(updated: string, now: Date): number | null {
+  const t = Date.parse(`${updated}:00+03:00`)
+  return Number.isNaN(t) ? null : (now.getTime() - t) / 3_600_000
+}
+
 const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
 
 /** "היום" or e.g. "יום שני 12.10". */

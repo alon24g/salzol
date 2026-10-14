@@ -37,3 +37,17 @@ def test_coordinates_are_sane(st):
     assert 50 < haversine_km(ta["lat"], ta["lon"], jlm["lat"], jlm["lon"]) < 55
     for r in st.by_code.values():
         assert 29.4 < r["lat"] < 33.4 and 34.2 < r["lon"] < 35.9
+
+
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ('ת"א - כיכר רבין', "תל אביב -יפו"),  # Good Pharm
+        ('סיטי מרקט פ.פ.ת בע"מ, פינסקר 21 פ"ת', "פתח תקווה"),  # City Market
+        ("נטו חיסכון בת ים* ת.", "בת ים"),  # Super Sapir
+        ("חוצות המפרץ", "חיפה"),  # Yohananof
+    ],
+)
+def test_city_from_store_name_with_abbreviations_and_landmarks(name, expected):
+    hit = Settlements.load().resolve("0", "unknown", name)
+    assert hit and hit["name"] == expected

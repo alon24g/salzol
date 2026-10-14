@@ -16,6 +16,7 @@ import re
 import sys
 import time
 import types
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,6 +30,7 @@ if sys.platform == "win32":
 
 from il_supermarket_scarper import FileTypesFilters, ScraperFactory  # noqa: E402
 from il_supermarket_scarper.engines import Bina  # noqa: E402
+from il_supermarket_scarper.utils.databases import AbstractDataBase  # noqa: E402
 from il_supermarket_scarper.utils.file_output import DiskFileOutput  # noqa: E402
 
 # Concurrent downloads per chain. Upstream default is 10; be polite (spec §10).
@@ -76,10 +78,39 @@ def _latest_per_store(original_unique):
     return unique
 
 
+class MemoryStatusDB(AbstractDataBase):
+    """In-memory replacement for the scraper's JSON status file.
+
+    Upstream rewrites <out>/status/<chain>.json once per listed file, which is O(n^2) and on
+    Windows fails with "[Errno 22] Invalid argument" for chains that list thousands of files
+    (Carrefour), aborting the chain. We never read that file, and every run starts from an
+    empty folder, so nothing needs to survive the process."""
+
+    def __init__(self, database_name: str) -> None:
+        super().__init__(database_name)
+        self.collections: dict[str, list] = defaultdict(list)
+
+    def insert_document(self, collection_name, document):
+        self.collections[collection_name].append(document)
+
+    def insert_documents(self, collection_name, documents):
+        self.collections[collection_name].extend(documents)
+
+    def already_downloaded(self, collection_name, query):
+        return any(all(d.get(k) == v for k, v in query.items()) for d in self.collections[collection_name])
+
+    def get_last_modified(self):
+        return None
+
+    def _update_last_modified(self):
+        pass
+
+
 def make_scraper(chain: str, out_dir: Path):
     # Keep files compressed on disk (~10x smaller); parse.xmlio unwraps gzip/zip itself.
     scraper = ScraperFactory[chain].value(
-        file_output=DiskFileOutput(storage_path=str(out_dir), extract_gz=False)
+        file_output=DiskFileOutput(storage_path=str(out_dir), extract_gz=False),
+        status_database=MemoryStatusDB(chain),
     )
     scraper.max_threads = MAX_CONCURRENT_DOWNLOADS
     scraper.unique = _latest_per_store(scraper.unique)
@@ -136,8 +167,9 @@ def main() -> None:
     ap.add_argument(
         "--require-prices",
         action="store_true",
-        help="exit 1 if any chain ends up with no PriceFull files (e.g. fetched after midnight, "
-        "before the chain published today's files), so the run isn't mistaken for good data",
+        help="exit 1 if no chain got any PriceFull files (e.g. fetched after midnight, before the "
+        "chains published today's files), so the run isn't mistaken for good data. A single empty "
+        "chain doesn't fail the run: pipeline.yml takes each chain from the newest run that has it",
     )
     args = ap.parse_args()
 
@@ -151,8 +183,10 @@ def main() -> None:
         json.dumps(results, ensure_ascii=False, indent=2), "utf-8"
     )
     empty = [r["chain"] for r in results if r.get("price_full", {}).get("files_on_disk", 0) == 0]
-    if args.require_prices and empty:
-        sys.exit(f"no PriceFull files for: {', '.join(empty)}")
+    if empty:
+        print(f"no PriceFull files for: {', '.join(empty)}", flush=True)
+    if args.require_prices and len(empty) == len(results):
+        sys.exit("no PriceFull files for any chain")
 
 
 if __name__ == "__main__":

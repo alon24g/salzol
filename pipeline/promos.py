@@ -180,20 +180,30 @@ def parse_promo_file(path: Path, chain: str) -> tuple[str, list[Promo]]:
     out: list[Promo] = []
     for pel in root.iter("Promotion", "promotion"):
         pd = leaf_dict(pel)
+        # Flat layout (City Market): coupon flag and club are nested one level down.
+        for sub in pel.iterchildren("AdditionalRestrictions", "Clubs"):
+            pd = {**leaf_dict(sub), **pd}
+        for f in ("start", "end"):
+            # "PromotionStartDateTime" vs. "PromotionStartDate" + "PromotionStartHour"
+            if not pd.get(f"promotion{f}datetime") and pd.get(f"promotion{f}date"):
+                pd[f"promotion{f}datetime"] = f"{pd[f'promotion{f}date']} {pd.get(f'promotion{f}hour', '')}".strip()
         club_only, club_name, conditional = _club(chain, pd.get("clubid", ""))
         is_coupon = pd.get("additionaliscoupon") == "1"
         # One promo per (promotion, kind): items of a promotion normally share a kind.
         by_kind: dict[tuple, Promo] = {}
-        for gel in pel.iter("Group", "group"):
-            gd = leaf_dict(gel)
+        # Grouped layout: Promotion/Groups/Group/PromotionItems/PromotionItem, deal fields per item.
+        # Flat layout (City Market): deal fields on the Promotion, Promotion/PromotionItems/Item.
+        groups = list(pel.iter("Group", "group")) or [pel]
+        for gel in groups:
+            gd = leaf_dict(gel) if gel is not pel else {"minpurchaseamount": pd.get("minpurchaseamount", "")}
             min_purchase = _f(gd.get("minpurchaseamount")) or None
-            for iel in gel.iter("PromotionItem", "promotionitem"):
+            for iel in gel.iter("PromotionItem", "promotionitem", "Item", "item"):
                 d = {**pd, **leaf_dict(iel)}
                 bc = canonical_barcode(d.get("itemcode", ""))
                 if not bc:
                     continue
                 kind, value, min_qty, get_qty = _item_kind(d)
-                if gd.get("groupid", "1") not in ("", "1"):
+                if gd.get("groupid", "1").lstrip("0") not in ("", "1"):  # Bina pads: "001"
                     # Later groups are the reward side of a multi-group promo: the free item of
                     # "1+1", the half-price item of "השני בחצי" (Rami Levy prices it as a
                     # fixed price!), the item you get after spending ₪100 (Shufersal SBOX).

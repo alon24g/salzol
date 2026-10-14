@@ -26,7 +26,8 @@ jobs:
     timeout-minutes: 90
     env:
       PYTHONUTF8: "1"
-      ISRAEL_CHAINS: VICTORY_NEW_SOURCE
+      # Keep in sync with CHAINS in pipeline/build.py.
+      ISRAEL_CHAINS: VICTORY_NEW_SOURCE,HAZI_HINAM,HET_COHEN_NEW_SOURCE,MAHSANI_ASHUK_NEW_SOURCE,SUPER_PHARM
     steps:
       - uses: actions/checkout@v4
 

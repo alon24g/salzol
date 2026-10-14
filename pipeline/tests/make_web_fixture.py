@@ -12,7 +12,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from pipeline.build import PRICE_SHARDS, PROMO_CHUNK
+from pipeline.build import PROMO_CHUNK
 
 
 def load(p: Path):
@@ -35,9 +35,10 @@ def main(src: Path, dst: Path, barcodes: list[str]) -> None:
     promo_cache: dict[tuple[str, int], list] = {}
     new_promos: dict[str, list] = {}
     remap: dict[tuple[str, int], int] = {}
-    shards: dict[int, dict] = {i: {} for i in range(PRICE_SHARDS)}
+    n_shards = load(src / "meta.json").get("price_shards", 256)  # the fixture keeps the source's count
+    shards: dict[int, dict] = {i: {} for i in range(n_shards)}
     for bc in barcodes:
-        shard = int(bc) % PRICE_SHARDS
+        shard = int(bc) % n_shards
         item = load(src / "prices" / f"{shard:03d}.json")[bc]
         for chain, idxs in item.get("pr", {}).items():
             out = []

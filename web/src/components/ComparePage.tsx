@@ -12,6 +12,7 @@ type View = 'chains' | 'stores'
 type Loaded = { key: string; lines: BasketLine[]; stores: StoresByChain; meta: Meta }
 
 const STORES_SHOWN = 20
+const CHAINS_SHOWN = 10
 
 export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; radiusKm: number; ctx: PricingContext }) {
   const { active } = useLists()
@@ -19,6 +20,7 @@ export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; rad
   const [failed, setFailed] = useState(false)
   const [mode, setMode] = useState<RankMode>('complete')
   const [view, setView] = useState<View>('chains')
+  const [allChains, setAllChains] = useState(false)
 
   // Reload when the list's items change (not on every quantity tweak: quantities are re-read below).
   const key = active.items.map((i) => i.barcode).join(',')
@@ -69,7 +71,9 @@ export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; rad
   if (failed) return <p role="alert" className="text-red-700">טעינת המחירים נכשלה. נסו לרענן את הדף.</p>
   if (!data) return <p className="text-stone-500">מחשב את הסל…</p>
 
-  const results: StoreBasket[] = view === 'chains' ? bestPerChain(baskets, mode) : rank(baskets, mode).slice(0, STORES_SHOWN)
+  const perChain = view === 'chains' ? bestPerChain(baskets, mode) : []
+  const results: StoreBasket[] =
+    view === 'chains' ? perChain.slice(0, allChains ? undefined : CHAINS_SHOWN) : rank(baskets, mode).slice(0, STORES_SHOWN)
   // "Savings vs. the most expensive" only compares baskets that have every item.
   const complete = results.filter((r) => r.missing.length === 0)
   const mostExpensive = complete.length > 1 ? Math.max(...complete.map((r) => r.total)) : null
@@ -122,6 +126,11 @@ export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; rad
             />
           ))}
         </ol>
+      )}
+      {perChain.length > results.length && (
+        <button type="button" className="btn-soft self-center" onClick={() => setAllChains(true)} data-testid="show-all-chains">
+          הצגת כל {perChain.length} הרשתות
+        </button>
       )}
       {hiddenIncomplete > 0 && (
         <p className="text-sm text-stone-500" data-testid="hidden-incomplete">
