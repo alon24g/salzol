@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bestPerChain, priceBasket, promoSaving, rank, type BasketLine } from './basket'
+import { bestPerChain, cheapestMarks, priceBasket, promoSaving, rank, type BasketLine } from './basket'
 import type { Promo, PricingContext } from './promos'
 import type { ItemPrices, StoresByChain } from './types'
 
@@ -117,5 +117,18 @@ describe('ranking', () => {
   })
   it('best store per chain', () => {
     expect(bestPerChain(baskets, 'complete').map((b) => [b.chain, b.storeIdx, b.storesCompared])).toEqual([['a', 0, 2]])
+  })
+})
+
+describe('cheapestMarks', () => {
+  it('marks every total tied with the lowest', () => {
+    expect(cheapestMarks([16.9, 16.9, 17.7])).toEqual([true, true, false])
+  })
+  it('compares to the agora, ignoring float noise', () => {
+    expect(cheapestMarks([0.1 + 0.2, 0.3, 1])).toEqual([true, true, false])
+  })
+  it('marks nothing when all are equal or there is only one', () => {
+    expect(cheapestMarks([5, 5])).toEqual([false, false])
+    expect(cheapestMarks([5])).toEqual([false])
   })
 })

@@ -68,7 +68,9 @@ test.describe('basket comparison', () => {
     await expect.poll(async () => (await compare.totals()).length).toBeGreaterThan(1)
     const totals = await compare.totals()
     expect([...totals].sort((a, b) => a - b)).toEqual(totals)
-    await expect(page.getByTestId('basket-best')).toHaveCount(1)
+    // Every store tied with the cheapest gets the badge (unless all cost the same).
+    const tied = totals.filter((t) => t === totals[0]).length
+    await expect(page.getByTestId('basket-best')).toHaveCount(tied < totals.length ? tied : 0)
     if (totals[0] < totals[totals.length - 1]) {
       await expect(compare.baskets.first().getByTestId('basket-vs-max')).toBeVisible()
     }

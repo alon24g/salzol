@@ -233,3 +233,14 @@ function compare(mode: RankMode) {
 function round2(n: number) {
   return Math.round(n * 100) / 100
 }
+
+/**
+ * Which totals get the "cheapest" badge: every one tied (to the agora) with the lowest, but none
+ * when all are equal — a badge on every card says nothing.
+ */
+export function cheapestMarks(totals: number[]): boolean[] {
+  const agorot = totals.map((t) => Math.round(t * 100))
+  const min = Math.min(...agorot)
+  if (agorot.every((a) => a === min)) return agorot.map(() => false)
+  return agorot.map((a) => a === min)
+}

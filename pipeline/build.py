@@ -31,6 +31,14 @@ EXCLUDED_SETTLEMENTS = {2600}  # CBS settlement codes
 # "שופרסל ONLINE", "מרלוג אינטרנט", Victory "אינטרנט"). Online-only stores are excluded.
 ONLINE_STORE_TYPE = "2"
 
+# ManufacturerName values meaning "unknown": these two words and punctuation-only fillers ("---", ".").
+UNKNOWN_MANUFACTURERS = {"לא ידוע", "כללי"}
+
+
+def known_manufacturer(name: str) -> bool:
+    return bool(name) and name not in UNKNOWN_MANUFACTURERS and any(c.isalnum() for c in name)
+
+
 # ScraperFactory name → public chain slug + Hebrew display name.
 CHAINS = {
     "SHUFERSAL": ("shufersal", "שופרסל"),
@@ -251,7 +259,7 @@ def build(raw: Path, out: Path) -> dict:
                 agg = items[bc]
                 if r.name:
                     agg.names[r.name].add(slug)
-                if r.manufacturer and r.manufacturer not in ("לא ידוע", "כללי"):
+                if known_manufacturer(r.manufacturer):
                     agg.manufacturers[r.manufacturer] += 1
                 agg.weighted[r.is_weighted] += 1
                 if up:

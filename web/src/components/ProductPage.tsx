@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { cheapestMarks } from '../lib/basket'
 import { loadItem, loadItemPromos, loadMeta, loadStores } from '../lib/data'
 import { formatKm, formatPrice, formatUpdated } from '../lib/format'
 import { DEFAULT_RADIUS_KM, chainOffers, unitPrice, type ChainOffer, type Place } from '../lib/nearby'
@@ -58,6 +59,7 @@ export function ProductPage({ barcode, place, ctx }: { barcode: string; place: P
 
   const { item, meta } = data
   const totalChains = Object.keys(item.c).length
+  const best = cheapestMarks(offers.map((o) => o.cheapest.total))
 
   return (
     <article className="flex flex-col gap-4" data-testid="product-page">
@@ -104,7 +106,7 @@ export function ProductPage({ barcode, place, ctx }: { barcode: string; place: P
       ) : (
         <ol className="flex flex-col gap-3" data-testid="chain-offers">
           {offers.map((o, i) => (
-            <ChainRow key={o.chain} offer={o} best={i === 0 && offers.length > 1} item={item} meta={meta} hasPlace={!!place} qty={qty} />
+            <ChainRow key={o.chain} offer={o} best={best[i]} item={item} meta={meta} hasPlace={!!place} qty={qty} />
           ))}
         </ol>
       )}

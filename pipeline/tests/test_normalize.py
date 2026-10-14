@@ -60,3 +60,13 @@ def test_invalid_prices():
     assert not is_valid_price(0)
     assert not is_valid_price(-3)
     assert is_valid_price(0.1)
+
+
+@pytest.mark.parametrize(
+    "name,expected",
+    [("תנובה", True), ("Coca-Cola", True), ("---", False), (".", False), ("", False), ("לא ידוע", False), ("כללי", False)],
+)
+def test_known_manufacturer(name, expected):
+    from pipeline.build import known_manufacturer
+
+    assert known_manufacturer(name) is expected

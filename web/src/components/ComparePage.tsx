@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { bestPerChain, priceBasket, rank, type BasketLine, type RankMode, type StoreBasket } from '../lib/basket'
+import { bestPerChain, cheapestMarks, priceBasket, rank, type BasketLine, type RankMode, type StoreBasket } from '../lib/basket'
 import { loadItem, loadItemPromos, loadMeta, loadStores } from '../lib/data'
 import { formatKm, formatPrice } from '../lib/format'
 import { useLists } from '../lib/lists'
@@ -73,6 +73,8 @@ export function ComparePage({ place, ctx }: { place: Place | null; ctx: PricingC
   // "Savings vs. the most expensive" only compares baskets that have every item.
   const complete = results.filter((r) => r.missing.length === 0)
   const mostExpensive = complete.length > 1 ? Math.max(...complete.map((r) => r.total)) : null
+  // The badge goes to the cheapest among the baskets missing as few items as the top one.
+  const best = cheapestMarks(results.map((r) => (r.missing.length === results[0]?.missing.length ? r.total : Infinity)))
   const notFound = lines.filter((l) => !l.item)
   const hiddenIncomplete = mode === 'complete' ? rank(baskets, 'available').length - rank(baskets, 'complete').length : 0
 
@@ -113,7 +115,7 @@ export function ComparePage({ place, ctx }: { place: Place | null; ctx: PricingC
               key={`${b.chain}:${b.storeIdx}`}
               basket={b}
               chainName={data.meta.chains[b.chain]?.name ?? b.chain}
-              best={i === 0 && results.length > 1}
+              best={best[i]}
               vsMax={mostExpensive != null && b.missing.length === 0 ? mostExpensive - b.total : 0}
               showMissing={mode === 'available'}
               storesCompared={'storesCompared' in b ? (b as { storesCompared: number }).storesCompared : undefined}
