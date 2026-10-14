@@ -2,9 +2,44 @@
 
 @theme {
   --font-sans: "Heebo", system-ui, sans-serif;
+  --font-display: "Rubik", "Heebo", system-ui, sans-serif;
+  --color-cream: #fbf7ef;
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-sun: #f59e0b;
 }
 
 html {
-  background: var(--color-stone-50);
+  background: var(--color-cream);
   color: var(--color-stone-900);
+}
+
+body {
+  /* A soft wash of green and warm light at the top of every page. */
+  background:
+    radial-gradient(60rem 22rem at 85% -6rem, rgb(16 185 129 / 0.14), transparent 70%),
+    radial-gradient(40rem 18rem at 0% -4rem, rgb(245 158 11 / 0.12), transparent 70%),
+    var(--color-cream);
+  background-repeat: no-repeat;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-stone-200/80 bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04),0_4px_16px_-6px_rgb(0_0_0/0.08)];
+  }
+  .btn-primary {
+    @apply rounded-xl bg-brand-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.98] disabled:opacity-60;
+  }
+  .btn-soft {
+    @apply rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition hover:border-brand-600 hover:text-brand-800 disabled:opacity-50;
+  }
+  .link {
+    @apply font-medium text-brand-700 underline decoration-brand-600/30 underline-offset-4 hover:decoration-brand-600;
+  }
+  .badge-best {
+    @apply rounded-full bg-sun px-2.5 py-0.5 text-xs font-bold text-stone-900;
+  }
 }

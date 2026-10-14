@@ -10,7 +10,8 @@ export function Footer() {
   }, [])
 
   return (
-    <footer className="mt-10 border-t border-stone-200 pt-4 text-xs leading-relaxed text-stone-500" data-testid="footer">
+    <footer className="mt-12 border-t border-stone-200 pt-5 text-xs leading-relaxed text-stone-500" data-testid="footer">
+      <p className="mb-2 font-display text-sm font-semibold text-stone-700">סל זול 💚 עוזרים לחסוך בקניות בסופר</p>
       <p>
         המחירים מבוססים על הקבצים שהרשתות מפרסמות לפי חוק קידום התחרות בענף המזון (שקיפות מחירים). מחיר המדף בפועל עשוי
         להיות שונה, ולמבצעים עשויים להיות תנאים נוספים (ראו את תיאור המבצע). קופונים אישיים ומבצעים שלא ניתן לפענח

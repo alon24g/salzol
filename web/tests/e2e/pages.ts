@@ -15,6 +15,10 @@ export class LocationBar {
     await this.page.getByTestId('city-select').selectOption(name)
     await expect(this.label).toHaveText(name)
   }
+  async setRadius(km: number) {
+    await this.page.getByTestId(`radius-${km}`).click()
+    await expect(this.page.getByTestId(`radius-${km}`)).toHaveAttribute('aria-pressed', 'true')
+  }
 }
 
 export class SearchPage {

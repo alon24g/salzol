@@ -58,7 +58,9 @@ test.describe('basket comparison', () => {
     await addViaProductPage(page, MILK, 2)
     await addViaProductPage(page, SPELT_FLOUR, 2)
     await addViaProductPage(page, PALMOLIVE, 1)
-    await new LocationBar(page).pickCity('הרצלייה')
+    const location = new LocationBar(page)
+    await location.pickCity('הרצלייה')
+    await location.setRadius(20)
   })
 
   test('stores that have everything, cheapest first, with savings vs. the most expensive', async ({ page }) => {

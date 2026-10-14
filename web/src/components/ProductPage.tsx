@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { cheapestMarks } from '../lib/basket'
 import { loadItem, loadItemPromos, loadMeta, loadStores } from '../lib/data'
 import { formatKm, formatPrice, formatUpdated } from '../lib/format'
-import { DEFAULT_RADIUS_KM, chainOffers, unitPrice, type ChainOffer, type Place } from '../lib/nearby'
+import { chainOffers, chainsOutOfRange, radiusToReach, unitPrice, type ChainOffer, type Place } from '../lib/nearby'
+import { chainSiteLink } from '../lib/chainSites'
 import { listsStore, useLists } from '../lib/lists'
 import { promoLabel, type Blocker, type PricingContext, type Promo } from '../lib/promos'
 import { listHref } from '../lib/router'
@@ -17,7 +18,9 @@ type Loaded = {
   promos: Record<string, Promo[]>
 }
 
-export function ProductPage({ barcode, place, ctx }: { barcode: string; place: Place | null; ctx: PricingContext }) {
+type Props = { barcode: string; place: Place | null; radiusKm: number; setRadius: (km: number) => void; ctx: PricingContext }
+
+export function ProductPage({ barcode, place, radiusKm, setRadius, ctx }: Props) {
   // Results are keyed by barcode so navigating to another product never shows stale data.
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
@@ -43,8 +46,8 @@ export function ProductPage({ barcode, place, ctx }: { barcode: string; place: P
   const listed = active.items.find((i) => i.barcode === barcode)
 
   const offers = useMemo(
-    () => (data?.item ? chainOffers(data.item, data.stores, place, { qty, ctx, promos: data.promos }) : []),
-    [data, place, qty, ctx],
+    () => (data?.item ? chainOffers(data.item, data.stores, place, { radiusKm, qty, ctx, promos: data.promos }) : []),
+    [data, place, radiusKm, qty, ctx],
   )
 
   if (error) return <p role="alert" className="text-red-700">טעינת המוצר נכשלה. נסו לרענן את הדף.</p>
@@ -53,21 +56,22 @@ export function ProductPage({ barcode, place, ctx }: { barcode: string; place: P
     return (
       <p data-testid="product-not-found">
         לא מצאנו את הברקוד <span dir="ltr">{barcode}</span>.{' '}
-        <a href="#/" className="text-emerald-800 underline">חזרה לחיפוש</a>
+        <a href="#/" className="link">חזרה לחיפוש</a>
       </p>
     )
 
   const { item, meta } = data
-  const totalChains = Object.keys(item.c).length
   const best = cheapestMarks(offers.map((o) => o.cheapest.total))
+  const outOfRange = place ? chainsOutOfRange(item, data.stores, place, offers) : []
+  const chainName = (slug: string) => meta.chains[slug]?.name ?? slug
 
   return (
     <article className="flex flex-col gap-4" data-testid="product-page">
-      <header>
-        <a href="#/" onClick={(e) => { if (history.length > 1) { e.preventDefault(); history.back() } }} className="text-sm text-emerald-800 underline">
+      <header className="flex flex-col gap-1">
+        <a href="#/" onClick={(e) => { if (history.length > 1) { e.preventDefault(); history.back() } }} className="link self-start text-sm">
           → חזרה
         </a>
-        <h1 className="mt-1 text-2xl font-bold" data-testid="product-name">{item.n}</h1>
+        <h1 className="font-display text-2xl font-bold sm:text-3xl" data-testid="product-name">{item.n}</h1>
         <p className="text-sm text-stone-500">
           {item.b && `${item.b} · `}
           {item.size && !item.w && `${sizeLabel(item.size)} · `}
@@ -76,45 +80,63 @@ export function ProductPage({ barcode, place, ctx }: { barcode: string; place: P
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="card flex flex-wrap items-center justify-between gap-3 p-3">
         <QuantityStepper weighted={item.w} value={qty} onChange={(q) => setQtyFor({ barcode, qty: q })} />
         <button
           type="button"
-          className="rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white"
+          className="btn-primary"
           onClick={() => listsStore.addItem({ barcode, name: item.n, weighted: item.w }, qty)}
           data-testid="product-add-to-list"
         >
           + הוספה לרשימה
         </button>
+        {listed && (
+          <p className="w-full text-sm text-brand-800" data-testid="product-in-list">
+            ✓ ברשימה „{active.name}”: {listed.qty} {item.w ? 'ק"ג' : "יח'"} · <a href={listHref} className="link">לרשימה</a>
+          </p>
+        )}
       </div>
-      {listed && (
-        <p className="text-sm text-emerald-800" data-testid="product-in-list">
-          ברשימה „{active.name}”: {listed.qty} {item.w ? 'ק"ג' : "יח'"} · <a href={listHref} className="underline">לרשימה</a>
-        </p>
-      )}
 
       {!place && (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900" data-testid="no-place-note">
-          לא נבחר מיקום — מוצגים המחירים הזולים ביותר בכל הארץ. בחרו מיקום למעלה כדי לראות חנויות עד {DEFAULT_RADIUS_KM} ק"מ מכם.
+        <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900" data-testid="no-place-note">
+          👋 עדיין לא בחרתם מיקום, אז מוצגים המחירים הזולים בכל הארץ. בחרו מיקום למעלה כדי לראות את הסופרים הקרובים אליכם.
         </p>
       )}
 
       {offers.length === 0 ? (
-        <p className="rounded-lg bg-stone-100 p-3" data-testid="no-offers">
-          אין חנויות של הרשתות שמוכרות את המוצר במרחק {DEFAULT_RADIUS_KM} ק"מ מ{place?.label}.
+        <p className="card p-4 text-stone-700" data-testid="no-offers">
+          אין סופר שמוכר את המוצר עד {radiusKm} ק"מ מ{place?.label}.
         </p>
       ) : (
         <ol className="flex flex-col gap-3" data-testid="chain-offers">
           {offers.map((o, i) => (
-            <ChainRow key={o.chain} offer={o} best={best[i]} item={item} meta={meta} hasPlace={!!place} qty={qty} />
+            <ChainRow key={o.chain} offer={o} best={best[i]} item={item} barcode={barcode} meta={meta} radiusKm={place ? radiusKm : null} qty={qty} />
           ))}
         </ol>
       )}
 
-      {place && offers.length < totalChains && (
-        <p className="text-sm text-stone-500" data-testid="missing-chains">
-          {totalChains - offers.length === 1 ? 'רשת אחת נוספת מוכרת' : `${totalChains - offers.length} רשתות נוספות מוכרות`} את המוצר, אבל אין לה סניף בטווח.
-        </p>
+      {offers.length > 0 && (
+        <p className="text-xs text-stone-500">↗ הקישורים לאתרי הרשתות מחפשים את המוצר בחנות המקוונת; המחיר שם עשוי להיות שונה ממחיר הסניף.</p>
+      )}
+
+      {outOfRange.length > 0 && (
+        <ul className="flex flex-col gap-2 text-sm" data-testid="missing-chains">
+          {outOfRange.map(({ chain, nearestKm }) => {
+            const reach = radiusToReach(nearestKm)
+            return (
+              <li key={chain} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-dashed border-stone-300 px-3 py-2 text-stone-600" data-testid="out-of-range" data-chain={chain}>
+                <span>
+                  ל<strong>{chainName(chain)}</strong> אין סניף שמוכר את המוצר עד {radiusKm} ק"מ. הקרוב ביותר: {formatKm(nearestKm)}.
+                </span>
+                {reach && (
+                  <button type="button" className="link" onClick={() => setRadius(reach)} data-testid="widen-radius">
+                    הרחבה ל-{reach} ק"מ
+                  </button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
       )}
     </article>
   )
@@ -131,25 +153,29 @@ function qtyLabel(qty: number, weighted: boolean): string {
   return weighted ? `${qty} ק"ג` : `${qty} יח'`
 }
 
-function ChainRow({ offer, best, item, meta, hasPlace, qty }: { offer: ChainOffer; best: boolean; item: ItemPrices; meta: Meta; hasPlace: boolean; qty: number }) {
+type ChainRowProps = { offer: ChainOffer; best: boolean; item: ItemPrices; barcode: string; meta: Meta; radiusKm: number | null; qty: number }
+
+function ChainRow({ offer, best, item, barcode, meta, radiusKm, qty }: ChainRowProps) {
   const [open, setOpen] = useState(false)
   const chain = meta.chains[offer.chain]
   const { store, distanceKm, total, regular, applied, other } = offer.cheapest
   const perUnit = total / qty
   const up = unitPrice(perUnit, item.size, item.w)
   const saved = regular * qty - total
+  const hasPlace = radiusKm != null
+  const site = chainSiteLink(offer.chain, barcode, item.n)
 
   return (
     <li
-      className={`rounded-xl border bg-white p-4 shadow-sm ${best ? 'border-emerald-600 ring-1 ring-emerald-600' : 'border-stone-200'}`}
+      className={`card p-4 ${best ? 'border-brand-600 ring-2 ring-brand-600/70' : ''}`}
       data-testid="chain-offer"
       data-chain={offer.chain}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
-          <span className="flex items-center gap-2 text-lg font-semibold">
+          <span className="flex items-center gap-2 font-display text-lg font-bold">
             {chain?.name ?? offer.chain}
-            {best && <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-xs font-medium text-white" data-testid="cheapest-badge">הכי זול</span>}
+            {best && <span className="badge-best" data-testid="cheapest-badge">🏆 הכי זול</span>}
           </span>
           <span className="text-sm text-stone-600" data-testid="cheapest-store">
             {store.name}
@@ -157,12 +183,12 @@ function ChainRow({ offer, best, item, meta, hasPlace, qty }: { offer: ChainOffe
             {distanceKm != null && ` · ${formatKm(distanceKm)}`}
           </span>
           <span className="text-xs text-stone-500">
-            {offer.storesAtCheapest > 1 && `המחיר הזה ב-${offer.storesAtCheapest} סניפים${hasPlace ? ' בטווח' : ''} · `}
+            {offer.storesAtCheapest > 1 && `המחיר הזה ב-${offer.storesAtCheapest} סניפים${hasPlace ? ` עד ${radiusKm} ק"מ` : ''} · `}
             עודכן {formatUpdated(chain?.updated ?? '')}
           </span>
         </div>
         <div className="flex shrink-0 flex-col items-end">
-          <span className="text-2xl font-bold" data-testid="cheapest-price">{formatPrice(total)}</span>
+          <span className="font-display text-2xl font-extrabold text-brand-800" data-testid="cheapest-price">{formatPrice(total)}</span>
           {qty !== 1 && <span className="text-xs text-stone-500">ל-{qtyLabel(qty, item.w)}</span>}
           {applied && (
             <span className="text-xs text-stone-500 line-through" data-testid="regular-price">
@@ -187,35 +213,34 @@ function ChainRow({ offer, best, item, meta, hasPlace, qty }: { offer: ChainOffe
         </ul>
       )}
 
-      {offer.offers.length > 1 && (
-        <>
-          <button
-            type="button"
-            className="mt-2 text-sm text-emerald-800 underline"
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-            data-testid="toggle-stores"
-          >
-            {open ? 'הסתר סניפים' : `כל ${offer.offers.length} הסניפים${hasPlace ? ' בטווח' : ''}`}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {offer.offers.length > 1 && (
+          <button type="button" className="btn-soft" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="toggle-stores">
+            {open ? 'הסתרת הסניפים' : `${hasPlace ? 'כל הסניפים לידי' : 'כל הסניפים'} (${offer.offers.length})`}
           </button>
-          {open && (
-            <ul className="mt-2 max-h-80 divide-y divide-stone-100 overflow-y-auto text-sm" data-testid="store-list">
-              {offer.offers.map((s) => (
-                <li key={s.store.id} className="flex justify-between gap-2 py-1.5">
-                  <span>
-                    {s.store.name}
-                    {s.store.city && s.store.city !== s.store.name && <span className="text-stone-500">, {s.store.city}</span>}
-                    {s.distanceKm != null && <span className="text-stone-500"> · {formatKm(s.distanceKm)}</span>}
-                  </span>
-                  <span className="shrink-0 font-medium">
-                    {s.applied && <span className="me-1 text-xs text-emerald-700">מבצע</span>}
-                    {formatPrice(s.total)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+        )}
+        {site && (
+          <a href={site.href} target="_blank" rel="noopener noreferrer" className="btn-soft" data-testid="chain-site-link">
+            לאתר {site.label} ↗
+          </a>
+        )}
+      </div>
+      {open && (
+        <ul className="mt-2 max-h-80 divide-y divide-stone-100 overflow-y-auto text-sm" data-testid="store-list">
+          {(hasPlace ? [...offer.offers].sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0) || a.total - b.total) : offer.offers).map((s) => (
+            <li key={s.store.id} className="flex justify-between gap-2 py-1.5">
+              <span>
+                {s.store.name}
+                {s.store.city && s.store.city !== s.store.name && <span className="text-stone-500">, {s.store.city}</span>}
+                {s.distanceKm != null && <span className="text-stone-500"> · {formatKm(s.distanceKm)}</span>}
+              </span>
+              <span className="shrink-0 font-medium">
+                {s.applied && <span className="me-1 text-xs text-brand-700">מבצע</span>}
+                {formatPrice(s.total)}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </li>
   )

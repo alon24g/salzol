@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { canonicalBarcode, shardOf } from './data'
-import { chainOffers, haversineKm, unitPrice, type Place } from './nearby'
+import { chainOffers, chainsOutOfRange, haversineKm, radiusToReach, unitPrice, type Place } from './nearby'
 import type { ItemPrices, StoresByChain } from './types'
 
 const TEL_AVIV: Place = { lat: 32.07638, lon: 34.78933, label: 'תל אביב', source: 'city' }
@@ -108,5 +108,20 @@ describe('barcodes', () => {
   it('shard matches Python int(barcode) % 256', () => {
     // 7290116936291 % 256 == 99, computed with Python
     expect(shardOf('7290116936291')).toBe(String(7290116936291 % 256).padStart(3, '0'))
+  })
+})
+
+describe('near me', () => {
+  it('the default radius is the local area, not the whole region', () => {
+    const offers = chainOffers(item, stores, TEL_AVIV)
+    expect(offers[0].offers.map((o) => o.store.id).sort()).toEqual(['1', '3']) // Tel Aviv + Ramat Gan
+  })
+  it('reports how far the nearest store is for chains out of range', () => {
+    const inRange = chainOffers(item, stores, TEL_AVIV, { radiusKm: 5 })
+    const out = chainsOutOfRange(item, stores, TEL_AVIV, inRange)
+    expect(out.map((o) => o.chain)).toEqual(['b'])
+    expect(out[0].nearestKm).toBeGreaterThan(50) // Jerusalem; the online store has no location
+    expect(radiusToReach(out[0].nearestKm)).toBeNull()
+    expect(radiusToReach(3.2)).toBe(5)
   })
 })

@@ -1,7 +1,17 @@
 import { useCallback, useState } from 'react'
-import type { Place } from './nearby'
+import { DEFAULT_RADIUS_KM, RADIUS_OPTIONS, type Place } from './nearby'
 
 const KEY = 'salzol.place'
+const RADIUS_KEY = 'salzol.radius'
+
+function readRadius(): number {
+  try {
+    const r = Number(localStorage.getItem(RADIUS_KEY))
+    return (RADIUS_OPTIONS as readonly number[]).includes(r) ? r : DEFAULT_RADIUS_KM
+  } catch {
+    return DEFAULT_RADIUS_KM
+  }
+}
 
 function read(): Place | null {
   try {
@@ -26,6 +36,16 @@ export type GeoStatus = 'idle' | 'locating' | 'denied' | 'unavailable'
 export function usePlace() {
   const [place, setPlaceState] = useState<Place | null>(read)
   const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle')
+  const [radiusKm, setRadiusState] = useState<number>(readRadius)
+
+  const setRadius = useCallback((r: number) => {
+    try {
+      localStorage.setItem(RADIUS_KEY, String(r))
+    } catch {
+      // storage unavailable: keep it for this visit
+    }
+    setRadiusState(r)
+  }, [])
 
   const setPlace = useCallback((p: Place | null) => {
     write(p)
@@ -48,5 +68,5 @@ export function usePlace() {
     )
   }, [setPlace])
 
-  return { place, setPlace, locate, geoStatus }
+  return { place, setPlace, locate, geoStatus, radiusKm, setRadius }
 }

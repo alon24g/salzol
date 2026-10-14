@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { loadCities } from '../lib/data'
 import type { GeoStatus } from '../lib/location'
-import { DEFAULT_RADIUS_KM, type Place } from '../lib/nearby'
+import { RADIUS_OPTIONS, type Place } from '../lib/nearby'
 import type { CityRow } from '../lib/types'
 
 type Props = {
@@ -9,15 +9,17 @@ type Props = {
   setPlace: (p: Place | null) => void
   locate: () => void
   geoStatus: GeoStatus
+  radiusKm: number
+  setRadius: (km: number) => void
 }
 
 const GEO_MESSAGES: Partial<Record<GeoStatus, string>> = {
-  locating: 'מאתר מיקום…',
-  denied: 'הגישה למיקום נחסמה. אפשר לבחור עיר.',
-  unavailable: 'לא הצלחנו לאתר מיקום. אפשר לבחור עיר.',
+  locating: 'מאתרים את המיקום שלכם…',
+  denied: 'הגישה למיקום נחסמה. אפשר לבחור עיר מהרשימה.',
+  unavailable: 'לא הצלחנו לאתר מיקום. אפשר לבחור עיר מהרשימה.',
 }
 
-export function LocationBar({ place, setPlace, locate, geoStatus }: Props) {
+export function LocationBar({ place, setPlace, locate, geoStatus, radiusKm, setRadius }: Props) {
   const [cities, setCities] = useState<CityRow[]>([])
   const [editing, setEditing] = useState(!place)
 
@@ -34,23 +36,44 @@ export function LocationBar({ place, setPlace, locate, geoStatus }: Props) {
 
   if (place && !editing) {
     return (
-      <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="location-bar">
-        <span>
-          📍 חנויות עד {DEFAULT_RADIUS_KM} ק"מ מ<strong data-testid="location-label">{place.label}</strong>
-        </span>
-        <button type="button" className="text-emerald-800 underline" onClick={() => setEditing(true)} data-testid="location-change">
-          שינוי
-        </button>
+      <div className="flex flex-col gap-2 text-sm" data-testid="location-bar">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span aria-hidden>📍</span>
+          <span>
+            סופרים ליד <strong data-testid="location-label">{place.label}</strong>
+          </span>
+          <button type="button" className="link text-sm" onClick={() => setEditing(true)} data-testid="location-change">
+            שינוי
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="מרחק מקסימלי">
+          <span className="text-stone-500">עד</span>
+          {RADIUS_OPTIONS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              aria-pressed={r === radiusKm}
+              onClick={() => setRadius(r)}
+              className={`rounded-full px-3 py-1 font-medium transition ${
+                r === radiusKm ? 'bg-brand-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-brand-50'
+              }`}
+              data-testid={`radius-${r}`}
+            >
+              {r} ק"מ
+            </button>
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
     <div className="flex flex-col gap-2 text-sm" data-testid="location-bar">
+      <p className="font-semibold text-stone-800">📍 איפה אתם קונים? נמצא את הסופרים הקרובים</p>
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="rounded-lg bg-emerald-700 px-3 py-2 font-medium text-white disabled:opacity-60"
+          className="btn-primary py-2"
           onClick={() => {
             locate()
             setEditing(false)
@@ -58,13 +81,13 @@ export function LocationBar({ place, setPlace, locate, geoStatus }: Props) {
           disabled={geoStatus === 'locating'}
           data-testid="locate-me"
         >
-          השתמש במיקום שלי
+          השתמשו במיקום שלי
         </button>
         <span className="text-stone-500">או</span>
         <label className="flex items-center gap-2">
           <span className="sr-only">בחירת עיר</span>
           <select
-            className="rounded-lg border border-stone-300 bg-white px-2 py-2"
+            className="rounded-xl border border-stone-300 bg-white px-3 py-2 focus:border-brand-600 focus:outline-none"
             defaultValue=""
             onChange={(e) => pickCity(e.target.value)}
             data-testid="city-select"

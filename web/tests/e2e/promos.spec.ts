@@ -10,7 +10,9 @@ const CAT_TREATS = '8595657306831' // Rami Levy: "1+1"
 test.describe('promotions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('./')
-    await new LocationBar(page).pickCity('הרצלייה')
+    const location = new LocationBar(page)
+    await location.pickCity('הרצלייה')
+    await location.setRadius(20) // the promo stores in the snapshot are spread around the Sharon
   })
 
   test('general promo is applied and the regular price shown struck through', async ({ page }) => {

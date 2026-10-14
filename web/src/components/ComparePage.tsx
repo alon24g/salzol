@@ -3,7 +3,7 @@ import { bestPerChain, cheapestMarks, priceBasket, rank, type BasketLine, type R
 import { loadItem, loadItemPromos, loadMeta, loadStores } from '../lib/data'
 import { formatKm, formatPrice } from '../lib/format'
 import { useLists } from '../lib/lists'
-import { DEFAULT_RADIUS_KM, type Place } from '../lib/nearby'
+import type { Place } from '../lib/nearby'
 import { promoLabel, type PricingContext } from '../lib/promos'
 import { listHref, productHref } from '../lib/router'
 import type { Meta, StoresByChain } from '../lib/types'
@@ -13,7 +13,7 @@ type Loaded = { key: string; lines: BasketLine[]; stores: StoresByChain; meta: M
 
 const STORES_SHOWN = 20
 
-export function ComparePage({ place, ctx }: { place: Place | null; ctx: PricingContext }) {
+export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; radiusKm: number; ctx: PricingContext }) {
   const { active } = useLists()
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [failed, setFailed] = useState(false)
@@ -58,12 +58,12 @@ export function ComparePage({ place, ctx }: { place: Place | null; ctx: PricingC
       }) ?? [],
     [data, active.items],
   )
-  const baskets = useMemo(() => (data ? priceBasket(lines, data.stores, { place, ctx }) : []), [data, lines, place, ctx])
+  const baskets = useMemo(() => (data ? priceBasket(lines, data.stores, { place, radiusKm, ctx }) : []), [data, lines, place, radiusKm, ctx])
 
   if (!active.items.length)
     return (
       <p data-testid="compare-empty">
-        הרשימה ריקה. <a href="#/" className="text-emerald-800 underline">חפשו מוצרים</a> והוסיפו אותם לרשימה.
+        הרשימה ריקה. <a href="#/" className="link">חפשו מוצרים</a> והוסיפו אותם לרשימה.
       </p>
     )
   if (failed) return <p role="alert" className="text-red-700">טעינת המחירים נכשלה. נסו לרענן את הדף.</p>
@@ -81,10 +81,10 @@ export function ComparePage({ place, ctx }: { place: Place | null; ctx: PricingC
   return (
     <section className="flex flex-col gap-4" data-testid="compare-page">
       <header className="flex flex-col gap-1">
-        <a href={listHref} className="text-sm text-emerald-800 underline">→ חזרה לרשימה</a>
-        <h1 className="text-2xl font-bold">השוואת סל: {active.name}</h1>
+        <a href={listHref} className="link self-start text-sm">→ חזרה לרשימה</a>
+        <h1 className="font-display text-2xl font-bold sm:text-3xl">השוואת סל: {active.name}</h1>
         <p className="text-sm text-stone-500">
-          {active.items.length} מוצרים · {place ? `חנויות עד ${DEFAULT_RADIUS_KM} ק"מ מ${place.label}` : 'כל הארץ (לא נבחר מיקום)'}
+          {active.items.length} מוצרים · {place ? `סופרים עד ${radiusKm} ק"מ מ${place.label}` : 'כל הארץ (לא נבחר מיקום)'}
         </p>
       </header>
 
@@ -103,10 +103,10 @@ export function ComparePage({ place, ctx }: { place: Place | null; ctx: PricingC
       )}
 
       {results.length === 0 ? (
-        <p className="rounded-lg bg-stone-100 p-3" data-testid="compare-no-results">
+        <p className="card p-4 text-stone-700" data-testid="compare-no-results">
           {mode === 'complete'
-            ? 'אין סניף בטווח שיש בו את כל המוצרים. נסו „כל הסניפים (הכי פחות חוסרים)”.'
-            : 'אין סניפים בטווח שמוכרים את המוצרים ברשימה.'}
+            ? `אין סופר עד ${radiusKm} ק"מ שיש בו את כל המוצרים. נסו „כל הסניפים (הכי פחות חוסרים)” או הגדילו את המרחק למעלה.`
+            : `אין סופרים עד ${radiusKm} ק"מ שמוכרים את המוצרים ברשימה. אפשר להגדיל את המרחק למעלה.`}
         </p>
       ) : (
         <ol className="flex flex-col gap-3" data-testid="compare-results">
@@ -125,7 +125,7 @@ export function ComparePage({ place, ctx }: { place: Place | null; ctx: PricingC
       )}
       {hiddenIncomplete > 0 && (
         <p className="text-sm text-stone-500" data-testid="hidden-incomplete">
-          {hiddenIncomplete} סניפים נוספים בטווח חסרים מוצרים מהרשימה ולכן לא מוצגים.
+          {hiddenIncomplete} סניפים נוספים באזור חסרים מוצרים מהרשימה ולכן לא מוצגים.
         </p>
       )}
     </section>
@@ -138,7 +138,7 @@ function Toggle({ on, onClick, children, testId }: { on: boolean; onClick: () =>
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-sm ${on ? 'bg-emerald-700 text-white' : 'border border-stone-300 bg-white'}`}
+      className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${on ? 'bg-brand-700 text-white shadow-sm' : 'border border-stone-200 bg-white hover:border-brand-600'}`}
       data-testid={testId}
     >
       {children}
@@ -164,16 +164,16 @@ function BasketCard({
   const [open, setOpen] = useState(false)
   return (
     <li
-      className={`rounded-xl border bg-white p-4 shadow-sm ${best ? 'border-emerald-600 ring-1 ring-emerald-600' : 'border-stone-200'}`}
+      className={`card p-4 ${best ? 'border-brand-600 ring-2 ring-brand-600/70' : ''}`}
       data-testid="basket"
       data-chain={b.chain}
       data-missing={b.missing.length}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
-          <span className="flex items-center gap-2 text-lg font-semibold">
+          <span className="flex items-center gap-2 font-display text-lg font-bold">
             {chainName}
-            {best && <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-xs font-medium text-white" data-testid="basket-best">הכי זול</span>}
+            {best && <span className="badge-best" data-testid="basket-best">🏆 הכי זול</span>}
           </span>
           <span className="text-sm text-stone-600" data-testid="basket-store">
             {b.store.name}
@@ -190,7 +190,7 @@ function BasketCard({
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end">
-          <span className="text-2xl font-bold" data-testid="basket-total">{formatPrice(b.total)}</span>
+          <span className="font-display text-2xl font-extrabold text-brand-800" data-testid="basket-total">{formatPrice(b.total)}</span>
           {b.savings > 0.004 && (
             <span className="text-xs text-emerald-800" data-testid="basket-savings">
               כולל מבצעים: −{formatPrice(b.savings)}
@@ -204,7 +204,7 @@ function BasketCard({
         </div>
       </div>
 
-      <button type="button" className="mt-2 text-sm text-emerald-800 underline" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="basket-toggle">
+      <button type="button" className="btn-soft mt-3" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="basket-toggle">
         {open ? 'הסתר פירוט' : 'פירוט לפי מוצר'}
       </button>
       {open && (

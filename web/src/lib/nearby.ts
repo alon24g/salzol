@@ -1,7 +1,10 @@
 import { priceAtStore, type PricedStore, type PricingContext, type Promo } from './promos'
 import type { ItemPrices, Size, Store, StoresByChain } from './types'
 
-export const DEFAULT_RADIUS_KM = 20
+// "Near me" choices. Store coordinates are city centroids (pipeline/geo.py), so 2 km is roughly
+// "my town", and larger radii pull in neighbouring towns.
+export const RADIUS_OPTIONS = [2, 5, 10, 20] as const
+export const DEFAULT_RADIUS_KM = 5
 
 export type Place = { lat: number; lon: number; label: string; source: 'gps' | 'city' }
 
@@ -86,4 +89,35 @@ export function unitPrice(price: number, size: Size | null, weighted: boolean): 
   const [amount, base, label] = size
   const per = base === 'g' || base === 'ml' ? 100 : 1
   return { value: (price / amount) * per, per: label }
+}
+
+/**
+ * For chains that sell the item but have no store within the radius: the distance to their
+ * nearest such store, so the UI can offer to widen the search. Nearest first.
+ */
+export function chainsOutOfRange(
+  item: ItemPrices,
+  stores: StoresByChain,
+  place: Place,
+  inRange: readonly { chain: string }[],
+): { chain: string; nearestKm: number }[] {
+  const shown = new Set(inRange.map((o) => o.chain))
+  const out: { chain: string; nearestKm: number }[] = []
+  for (const [chain, cp] of Object.entries(item.c)) {
+    if (shown.has(chain)) continue
+    let nearestKm = Infinity
+    for (const [, idxs] of cp.p) {
+      for (const i of idxs) {
+        const s = stores[chain]?.[i]
+        if (s?.lat != null && s.lon != null) nearestKm = Math.min(nearestKm, haversineKm(place, { lat: s.lat, lon: s.lon }))
+      }
+    }
+    if (nearestKm < Infinity) out.push({ chain, nearestKm })
+  }
+  return out.sort((a, b) => a.nearestKm - b.nearestKm)
+}
+
+/** The smallest radius option that reaches `km`, or null if none does. */
+export function radiusToReach(km: number): number | null {
+  return RADIUS_OPTIONS.find((r) => r >= km) ?? null
 }

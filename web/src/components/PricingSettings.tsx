@@ -35,16 +35,16 @@ export function PricingSettings({ ctx, today, setDay, toggleClub }: Props) {
           🗓️ קנייה ב<strong data-testid="shopping-day-label">{dayLabel(ctx.day, today)}</strong>
         </span>
         <span>· 🎟️ {memberOf.length ? `חבר/ה ב: ${memberOf.join(', ')}` : 'ללא מועדונים'}</span>
-        <span className="text-emerald-800 underline">{open ? 'סגירה' : 'שינוי'}</span>
+        <span className="link">{open ? 'סגירה' : 'שינוי'}</span>
       </button>
 
       {open && (
-        <div className="mt-2 flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-3">
+        <div className="mt-2 flex flex-col gap-3 rounded-xl bg-stone-50 p-3">
           <label className="flex flex-wrap items-center gap-2">
             <span>מתי קונים?</span>
             <input
               type="date"
-              className="rounded-lg border border-stone-300 px-2 py-1"
+              className="rounded-lg border border-stone-300 bg-white px-2 py-1"
               value={ctx.day}
               min={today}
               max={maxDay}

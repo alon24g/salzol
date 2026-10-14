@@ -44,7 +44,7 @@ export function ListPage() {
     }
   }
 
-  const small = 'rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm'
+  const small = 'btn-soft'
 
   return (
     <section className="flex flex-col gap-4" data-testid="list-page">
@@ -52,7 +52,7 @@ export function ListPage() {
         <label className="flex items-center gap-2">
           <span className="sr-only">בחירת רשימה</span>
           <select
-            className="rounded-lg border border-stone-300 bg-white px-2 py-2 text-lg font-semibold"
+            className="rounded-xl border border-stone-200 bg-white px-3 py-2 font-display text-lg font-bold shadow-sm focus:border-brand-600 focus:outline-none"
             value={active.id}
             onChange={(e) => listsStore.selectList(e.target.value)}
             data-testid="list-select"
@@ -76,13 +76,16 @@ export function ListPage() {
       </div>
 
       {active.items.length === 0 ? (
-        <p className="rounded-xl bg-white p-4 text-stone-600" data-testid="list-empty">
-          הרשימה ריקה. חפשו מוצר ולחצו „+ לרשימה”.
-        </p>
+        <div className="card flex flex-col items-center gap-2 p-8 text-center" data-testid="list-empty">
+          <span className="text-4xl" aria-hidden>🧺</span>
+          <p className="font-display text-lg font-bold">הרשימה עדיין ריקה</p>
+          <p className="text-stone-600">חפשו מוצרים ולחצו „+ לרשימה” — ואז נשווה לכם את כל הסל.</p>
+          <a href="#/" className="btn-primary mt-1">לחיפוש מוצרים</a>
+        </div>
       ) : (
-        <ul className="divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white" data-testid="list-items">
+        <ul className="card divide-y divide-stone-100" data-testid="list-items">
           {active.items.map((i) => (
-            <li key={i.barcode} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2" data-testid="list-item" data-barcode={i.barcode}>
+            <li key={i.barcode} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5" data-testid="list-item" data-barcode={i.barcode}>
               <a href={productHref(i.barcode)} className="min-w-0 flex-1 font-medium">
                 {i.name}
               </a>
@@ -98,8 +101,8 @@ export function ListPage() {
       )}
 
       {active.items.length > 0 && (
-        <a href={compareHref} className="rounded-xl bg-emerald-700 px-4 py-3 text-center text-lg font-semibold text-white" data-testid="list-compare">
-          השוואת סל ({active.items.length} מוצרים)
+        <a href={compareHref} className="btn-primary py-3.5 text-center text-lg" data-testid="list-compare">
+          💰 איפה הכי זול לקנות את הסל? ({active.items.length} מוצרים)
         </a>
       )}
 
@@ -116,7 +119,7 @@ export function ListPage() {
         </label>
       </div>
       {message && (
-        <p role="status" className={`break-all text-sm ${message.error ? 'text-red-700' : 'text-emerald-800'}`} data-testid="list-message">
+        <p role="status" className={`break-all text-sm ${message.error ? 'text-red-700' : 'text-brand-800'}`} data-testid="list-message">
           {message.text}
         </p>
       )}
