@@ -42,16 +42,7 @@ export type BasketOptions = { place: Place | null; radiusKm?: number; ctx: Prici
 /** Every store (in range) that sells at least one item of the list, priced for the basket. */
 export function priceBasket(lines: BasketLine[], stores: StoresByChain, opts: BasketOptions): StoreBasket[] {
   const { place, radiusKm = DEFAULT_RADIUS_KM, ctx } = opts
-  // line → chain → store index → regular price
-  const priceMaps = lines.map((line) => {
-    const m = new Map<string, Map<number, number>>()
-    for (const [chain, cp] of Object.entries(line.item?.c ?? {})) {
-      const byStore = new Map<number, number>()
-      for (const [price, idxs] of cp.p) for (const i of idxs) byStore.set(i, price)
-      m.set(chain, byStore)
-    }
-    return m
-  })
+  const priceMaps = lines.map(priceMap)
 
   const out: StoreBasket[] = []
   const chains = new Set(priceMaps.flatMap((m) => [...m.keys()]))
@@ -72,6 +63,17 @@ export function priceBasket(lines: BasketLine[], stores: StoresByChain, opts: Ba
     }
   }
   return out
+}
+
+/** chain → store index → regular price of one line */
+function priceMap(line: BasketLine): Map<string, Map<number, number>> {
+  const m = new Map<string, Map<number, number>>()
+  for (const [chain, cp] of Object.entries(line.item?.c ?? {})) {
+    const byStore = new Map<number, number>()
+    for (const [price, idxs] of cp.p) for (const i of idxs) byStore.set(i, price)
+    m.set(chain, byStore)
+  }
+  return m
 }
 
 function priceAtStoreBasket(
@@ -243,4 +245,98 @@ export function cheapestMarks(totals: number[]): boolean[] {
   const min = Math.min(...agorot)
   if (agorot.every((a) => a === min)) return agorot.map(() => false)
   return agorot.map((a) => a === min)
+}
+
+export type SplitBasket = {
+  parts: [StoreBasket, StoreBasket]
+  regularTotal: number
+  total: number
+  savings: number
+  missing: { barcode: string; name: string }[]
+}
+
+// Stores considered for a split: the best whole baskets, plus the cheapest few stores for each
+// item (a store that is cheap for one expensive item can win as the second stop).
+const SPLIT_POOL = 40
+const SPLIT_PER_LINE = 3
+// Pairs fully re-priced, picked by an estimate (each item at the cheaper store's price).
+const SPLIT_REPRICED = 40
+
+/**
+ * Cheapest ways to buy the list at two stores, fewest missing items first. Each item goes to the
+ * store where it costs less, then each store's share is priced again on its own: promotions that
+ * pool several items or need a minimum spend may no longer apply once the list is split.
+ * A heuristic, not an exhaustive search: the item assignment ignores how promotions interact.
+ */
+export function bestSplits(lines: BasketLine[], baskets: StoreBasket[], ctx: PricingContext, limit = 3): SplitBasket[] {
+  if (lines.length < 2) return []
+  const pool = new Set(rank(baskets, 'available').slice(0, SPLIT_POOL))
+  const lineTotal = (b: StoreBasket, barcode: string) => b.lines.find((l) => l.barcode === barcode)?.total
+  for (const line of lines) {
+    baskets
+      .filter((b) => lineTotal(b, line.barcode) != null)
+      .sort((a, b) => lineTotal(a, line.barcode)! - lineTotal(b, line.barcode)!)
+      .slice(0, SPLIT_PER_LINE)
+      .forEach((b) => pool.add(b))
+  }
+
+  // Per pool store: barcode → line total (promos as priced for the whole list there).
+  const stores = [...pool].map((b) => ({ b, totals: new Map(b.lines.map((l) => [l.barcode, l.total])) }))
+  const estimates: { a: number; b: number; missing: number; estimate: number }[] = []
+  for (let i = 0; i < stores.length; i++) {
+    for (let j = i + 1; j < stores.length; j++) {
+      let missing = 0
+      let estimate = 0
+      for (const line of lines) {
+        const x = stores[i].totals.get(line.barcode)
+        const y = stores[j].totals.get(line.barcode)
+        if (x == null && y == null) missing++
+        else estimate += Math.min(x ?? Infinity, y ?? Infinity)
+      }
+      estimates.push({ a: i, b: j, missing, estimate })
+    }
+  }
+  estimates.sort((p, q) => p.missing - q.missing || p.estimate - q.estimate)
+
+  const priceMaps = lines.map(priceMap)
+  const out: SplitBasket[] = []
+  for (const { a, b } of estimates.slice(0, SPLIT_REPRICED)) {
+    const sa = stores[a]
+    const sb = stores[b]
+    const toA: number[] = []
+    const toB: number[] = []
+    lines.forEach((line, li) => {
+      const x = sa.totals.get(line.barcode)
+      const y = sb.totals.get(line.barcode)
+      if (x == null && y == null) return
+      if (y == null || (x != null && x <= y)) toA.push(li)
+      else toB.push(li)
+    })
+    if (!toA.length || !toB.length) continue // all at one store: not a split
+    const part = (s: StoreBasket, lis: number[]) =>
+      priceAtStoreBasket(lis.map((li) => lines[li]), lis.map((li) => priceMaps[li]), s.chain, s.storeIdx, s.store, s.distanceKm, ctx)
+    const parts: [StoreBasket, StoreBasket] = [part(sa.b, toA), part(sb.b, toB)]
+    const covered = new Set([...toA, ...toB])
+    const regularTotal = round2(parts[0].regularTotal + parts[1].regularTotal)
+    const total = round2(parts[0].total + parts[1].total)
+    out.push({
+      parts: parts[0].total >= parts[1].total ? parts : [parts[1], parts[0]],
+      regularTotal,
+      total,
+      savings: round2(regularTotal - total),
+      missing: lines.filter((_, li) => !covered.has(li)).map((l) => ({ barcode: l.barcode, name: l.name })),
+    })
+  }
+  return out.sort((p, q) => p.missing.length - q.missing.length || p.total - q.total).slice(0, limit)
+}
+
+/**
+ * Whether a split is worth suggesting over the best single store: it has fewer missing items, or
+ * the same and saves at least ₪5 and 3% (a second stop for a few shekels isn't advice).
+ */
+export function splitWorthIt(split: SplitBasket, single: StoreBasket | undefined): boolean {
+  if (!single) return true
+  if (split.missing.length !== single.missing.length) return split.missing.length < single.missing.length
+  const saved = single.total - split.total
+  return saved >= 5 && saved >= single.total * 0.03
 }

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
-import { bestPerChain, cheapestMarks, priceBasket, rank, type BasketLine, type RankMode, type StoreBasket } from '../lib/basket'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { bestPerChain, bestSplits, cheapestMarks, priceBasket, rank, splitWorthIt, type BasketLine, type RankMode, type SplitBasket, type StoreBasket } from '../lib/basket'
 import { loadItem, loadItemPromos, loadMeta, loadStores } from '../lib/data'
 import { formatKm, formatPrice } from '../lib/format'
 import { useLists } from '../lib/lists'
-import type { Place } from '../lib/nearby'
+import { haversineKm, type Place } from '../lib/nearby'
 import { promoLabel, type PricingContext } from '../lib/promos'
 import { listHref, productHref } from '../lib/router'
 import type { Meta, StoresByChain } from '../lib/types'
@@ -61,6 +61,7 @@ export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; rad
     [data, active.items],
   )
   const baskets = useMemo(() => (data ? priceBasket(lines, data.stores, { place, radiusKm, ctx }) : []), [data, lines, place, radiusKm, ctx])
+  const splits = useMemo(() => bestSplits(lines, baskets, ctx), [lines, baskets, ctx])
 
   if (!active.items.length)
     return (
@@ -85,6 +86,10 @@ export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; rad
   // The badge goes to the cheapest among the baskets missing as few items as the top one.
   const best = cheapestMarks(results.map((r) => (r.missing.length === results[0]?.missing.length ? r.total : Infinity)))
   const notFound = lines.filter((l) => !l.item)
+  const bestSingle = rank(baskets, mode)[0]
+  const split = splits.find((s) => (mode === 'available' || s.missing.length === 0) && splitWorthIt(s, bestSingle))
+  // Shown right after the best single store: that stays the main answer, the split is the alternative.
+  const splitCard = split && <SplitCard split={split} single={bestSingle} chainName={(c) => data.meta.chains[c]?.name ?? c} />
   const hiddenIncomplete = mode === 'complete' ? rank(baskets, 'available').length - rank(baskets, 'complete').length : 0
 
   return (
@@ -112,23 +117,28 @@ export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; rad
       )}
 
       {results.length === 0 ? (
-        <p className="card p-4 text-stone-700" data-testid="compare-no-results">
-          {mode === 'complete'
-            ? `אין סופר עד ${radiusKm} ק"מ שיש בו את כל המוצרים. נסו „כל הסניפים (הכי פחות חוסרים)” או הגדילו את המרחק למעלה.`
-            : `אין סופרים עד ${radiusKm} ק"מ שמוכרים את המוצרים ברשימה. אפשר להגדיל את המרחק למעלה.`}
-        </p>
+        <>
+          <p className="card p-4 text-stone-700" data-testid="compare-no-results">
+            {mode === 'complete'
+              ? `אין סופר עד ${radiusKm} ק"מ שיש בו את כל המוצרים. נסו „כל הסניפים (הכי פחות חוסרים)” או הגדילו את המרחק למעלה.`
+              : `אין סופרים עד ${radiusKm} ק"מ שמוכרים את המוצרים ברשימה. אפשר להגדיל את המרחק למעלה.`}
+          </p>
+          {splitCard}
+        </>
       ) : (
         <ol className="flex flex-col gap-3" data-testid="compare-results">
           {results.map((b, i) => (
-            <BasketCard
-              key={`${b.chain}:${b.storeIdx}`}
-              basket={b}
-              chainName={data.meta.chains[b.chain]?.name ?? b.chain}
-              best={best[i]}
-              vsMax={mostExpensive != null && b.missing.length === 0 ? mostExpensive - b.total : 0}
-              showMissing={mode === 'available'}
-              storesCompared={'storesCompared' in b ? (b as { storesCompared: number }).storesCompared : undefined}
-            />
+            <Fragment key={`${b.chain}:${b.storeIdx}`}>
+              <BasketCard
+                basket={b}
+                chainName={data.meta.chains[b.chain]?.name ?? b.chain}
+                best={best[i]}
+                vsMax={mostExpensive != null && b.missing.length === 0 ? mostExpensive - b.total : 0}
+                showMissing={mode === 'available'}
+                storesCompared={'storesCompared' in b ? (b as { storesCompared: number }).storesCompared : undefined}
+              />
+              {i === 0 && splitCard && <li>{splitCard}</li>}
+            </Fragment>
           ))}
         </ol>
       )}
@@ -140,6 +150,67 @@ export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; rad
       {hiddenIncomplete > 0 && (
         <p className="text-sm text-stone-500" data-testid="hidden-incomplete">
           {hiddenIncomplete} סניפים נוספים באזור חסרים מוצרים מהרשימה ולכן לא מוצגים.
+        </p>
+      )}
+    </section>
+  )
+}
+
+function SplitCard({ split, single, chainName }: { split: SplitBasket; single: StoreBasket | undefined; chainName: (chain: string) => string }) {
+  const saved = single && single.missing.length === split.missing.length ? single.total - split.total : 0
+  const [a, b] = split.parts.map((p) => p.store)
+  // Stores are located at their city's center, so a distance only means something across cities.
+  const apart =
+    a.city !== b.city && a.lat != null && a.lon != null && b.lat != null && b.lon != null
+      ? haversineKm({ lat: a.lat, lon: a.lon }, { lat: b.lat, lon: b.lon })
+      : null
+  return (
+    <section className="card border-dashed border-brand-600 p-4" data-testid="split" aria-labelledby="split-title">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-0.5">
+          <h2 id="split-title" className="font-display text-lg font-bold">🛍️ או: קנייה בשני סניפים</h2>
+          <span className="text-sm text-stone-600" data-testid="split-why">
+            {saved > 0
+              ? `${formatPrice(saved)} פחות מהסניף הזול ביותר`
+              : split.missing.length === 0
+                ? 'יחד יש בהם את כל המוצרים ברשימה'
+                : `חסרים רק ${split.missing.length} מוצרים`}
+          </span>
+          {apart != null && (
+            <span className="text-xs text-stone-500" data-testid="split-apart">
+              {a.city} ו{b.city}: {formatKm(apart)} זו מזו
+            </span>
+          )}
+        </div>
+        <span className="shrink-0 font-display text-2xl font-extrabold text-brand-800" data-testid="split-total">{formatPrice(split.total)}</span>
+      </div>
+      <ol className="mt-3 grid gap-3 sm:grid-cols-2">
+        {split.parts.map((p) => (
+          <li key={`${p.chain}:${p.storeIdx}`} className="rounded-lg bg-stone-50 p-3" data-testid="split-part" data-chain={p.chain}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-bold">{chainName(p.chain)}</span>
+              <span className="font-medium" data-testid="split-part-total">{formatPrice(p.total)}</span>
+            </div>
+            <span className="block text-sm text-stone-600">
+              {p.store.name}
+              {p.store.city && p.store.city !== p.store.name && `, ${p.store.city}`}
+              {p.distanceKm != null && ` · ${formatKm(p.distanceKm)}`}
+            </span>
+            <ul className="mt-1.5 text-sm">
+              {p.lines.map((l) => (
+                <li key={l.barcode} data-testid="split-line">
+                  <a href={productHref(l.barcode)}>{l.name}</a>
+                  <span className="text-stone-500"> × {l.qty}</span>
+                  {l.promo && <span className="text-xs text-emerald-800"> · מבצע: {promoLabel(l.promo)}</span>}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+      {split.missing.length > 0 && (
+        <p className="mt-2 text-sm text-amber-800" data-testid="split-missing">
+          לא נמכרים באף אחד מהשניים: {split.missing.map((m) => m.name).join(', ')}
         </p>
       )}
     </section>

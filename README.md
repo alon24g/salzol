@@ -18,6 +18,8 @@ the price files every large chain must publish under the Food Act (price transpa
   price, and when each chain last updated.
 - **Shopping lists:** several named lists, quantities, and a **basket comparison** by chain or by store
   ("only stores with everything" or "fewest missing"). Lists can be shared by link or exported to a file.
+- **Split shopping:** when buying the list at two stores saves at least ₪5 and 3%, or two stores
+  together have items no single store has, the comparison suggests the pair and what to buy where.
 - **Installable PWA:** pages and prices you have seen keep working without a connection, so a list
   made at home can be compared in the store.
 - **About page:** data freshness for every chain (fresh, more than 48 h old, or no data).
@@ -52,7 +54,8 @@ chain portals ──▶ pipeline/fetch.py ──▶ raw XML ──▶ pipeline/b
   them once a newer build is published.
 
 Milestone reports with the details and decisions: [M0](docs/m0-reachability.md), [M1](docs/m1-report.md),
-[M3](docs/m3-report.md), [M4](docs/m4-report.md), [M5](docs/m5-report.md), [M6](docs/m6-report.md).
+[M3](docs/m3-report.md), [M4](docs/m4-report.md), [M5](docs/m5-report.md), [M6](docs/m6-report.md),
+[split shopping](docs/split-shopping.md).
 
 ## Setup
 

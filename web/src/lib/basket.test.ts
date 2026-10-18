@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bestPerChain, cheapestMarks, priceBasket, promoSaving, rank, type BasketLine } from './basket'
+import { bestPerChain, bestSplits, cheapestMarks, priceBasket, promoSaving, rank, splitWorthIt, type BasketLine } from './basket'
 import type { Promo, PricingContext } from './promos'
 import type { ItemPrices, StoresByChain } from './types'
 
@@ -130,5 +130,49 @@ describe('cheapestMarks', () => {
   it('marks nothing when all are equal or there is only one', () => {
     expect(cheapestMarks([5, 5])).toEqual([false, false])
     expect(cheapestMarks([5])).toEqual([false])
+  })
+})
+
+describe('bestSplits', () => {
+  const opts = { place: null, ctx }
+  const store = (b: { chain: string; storeIdx: number }) => `${b.chain}${b.storeIdx}`
+
+  it('sends each item to the cheaper store and covers items no single store has', () => {
+    const lines = [line('milk', 2, item({ a0: 6, a1: 7, b0: 5 })), line('bread', 1, item({ a0: 10, a1: 9 })), line('soap', 1, item({ b0: 3 }))]
+    const baskets = priceBasket(lines, stores, opts)
+    const [split] = bestSplits(lines, baskets, ctx)
+    expect(split.missing).toEqual([])
+    expect(split.total).toBe(22) // bread 9 at a1, milk 2×5 + soap 3 at b0
+    expect(split.parts.map(store)).toEqual(['b0', 'a1'])
+    expect(split.parts[0].lines.map((l) => l.barcode)).toEqual(['milk', 'soap'])
+    expect(splitWorthIt(split, rank(baskets, 'available')[0])).toBe(true) // the best single store misses an item
+  })
+
+  it("re-prices each store's share: a deal pooling items is lost when they are split", () => {
+    const pair = promo({ kind: 'n_for_price', value: 12, min_qty: 2 }) // milk + bread for ₪12 at chain a
+    const lines = [line('milk', 1, item({ a0: 6, b0: 4.4 }), { a: [pair] }), line('bread', 1, item({ a0: 10 }), { a: [pair] })]
+    const baskets = priceBasket(lines, stores, opts)
+    const single = rank(baskets, 'available')[0]
+    expect(single.total).toBe(12)
+    const [split] = bestSplits(lines, baskets, ctx)
+    expect(split.total).toBe(14.4) // milk 4.4 at b0 (under 4.50, its share of the deal), bread alone 10
+    expect(splitWorthIt(split, single)).toBe(false)
+  })
+
+  it('needs two stores and two items', () => {
+    const lines = [line('milk', 1, item({ a0: 6, b0: 5 }))]
+    expect(bestSplits(lines, priceBasket(lines, stores, opts), ctx)).toEqual([])
+    const both = [line('milk', 1, item({ a0: 6, a1: 6, b0: 5 })), line('salt', 1, item({ a0: 2, a1: 2, b0: 1 }))]
+    expect(bestSplits(both, priceBasket(both, stores, opts), ctx)).toEqual([]) // b0 is cheapest for everything
+  })
+
+  it('suggests a split only for a saving of at least ₪5 and 3%', () => {
+    const lines = [line('wine', 1, item({ a0: 100, b0: 140 })), line('cheese', 1, item({ a0: 60, b0: 40 }))]
+    const baskets = priceBasket(lines, stores, opts)
+    const [split] = bestSplits(lines, baskets, ctx)
+    expect(split.total).toBe(140)
+    expect(splitWorthIt(split, rank(baskets, 'complete')[0])).toBe(true) // ₪160 → ₪140
+    expect(splitWorthIt({ ...split, total: 156 }, rank(baskets, 'complete')[0])).toBe(false) // ₪4
+    expect(splitWorthIt({ ...split, total: 155.5 }, { ...rank(baskets, 'complete')[0], total: 300 })).toBe(true)
   })
 })

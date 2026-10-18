@@ -6,6 +6,7 @@ const MILK = '7290116936291'
 const SPELT_FLOUR = '7290002971993' // Victory "2ב30"
 const PALMOLIVE = '8850006960561' // Victory ₪17.90, club ₪13.90
 const CAT_TREATS = '8595657306831' // Rami Levy "1+1"; not sold at every store
+const PASTA = '8076809545464'
 
 async function addViaProductPage(page: Page, barcode: string, qty: number) {
   await new ProductPage(page).goto(barcode)
@@ -119,6 +120,46 @@ test.describe('basket comparison', () => {
     await page.getByTestId('mode-available').click()
     await expect.poll(async () => (await missing()).some((m) => m > 0)).toBe(true)
     await expect(page.getByTestId('basket-missing').first()).toContainText('חסרים')
+  })
+
+})
+
+test.describe('split shopping', () => {
+  async function compareInHaifa(page: Page, items: string[]) {
+    for (const barcode of items) await addViaProductPage(page, barcode, 1)
+    const location = new LocationBar(page)
+    await location.pickCity('חיפה')
+    await location.setRadius(20)
+    const compare = new ComparePage(page)
+    await compare.goto()
+    return compare
+  }
+
+  test('two stores beat the cheapest single store; each item is bought once', async ({ page }) => {
+    const compare = await compareInHaifa(page, [PASTA, PALMOLIVE, CAT_TREATS])
+    const split = page.getByTestId('split')
+    // Right after the cheapest single store, which stays the main answer.
+    await expect(page.locator('[data-testid="compare-results"] > li').nth(1).getByTestId('split')).toBeVisible()
+
+    const best = money(await compare.baskets.first().getByTestId('basket-total').innerText())
+    const total = money(await split.getByTestId('split-total').innerText())
+    expect(best - total).toBeGreaterThanOrEqual(5)
+    await expect(split.getByTestId('split-why')).toContainText('פחות מהסניף הזול ביותר')
+
+    await expect(split.getByTestId('split-part')).toHaveCount(2)
+    const parts = (await split.getByTestId('split-part-total').allInnerTexts()).map(money)
+    expect(parts[0] + parts[1]).toBeCloseTo(total, 2)
+    const bought = await split.getByTestId('split-line').locator('a').evaluateAll((els) => els.map((e) => e.getAttribute('href')))
+    expect(bought.sort()).toEqual([PASTA, PALMOLIVE, CAT_TREATS].map((b) => `#/p/${b}`).sort())
+  })
+
+  test('no store has everything, but two stores together do', async ({ page }) => {
+    await compareInHaifa(page, [CAT_TREATS, SPELT_FLOUR])
+    await expect(page.getByTestId('compare-no-results')).toBeVisible()
+    const split = page.getByTestId('split')
+    await expect(split.getByTestId('split-why')).toHaveText('יחד יש בהם את כל המוצרים ברשימה')
+    await expect(split.getByTestId('split-line')).toHaveCount(2)
+    await expect(split.getByTestId('split-missing')).toHaveCount(0)
   })
 })
 
