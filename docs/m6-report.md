@@ -81,8 +81,13 @@ A live smoke test from the home PC:
 ## Seen during the deploy
 
 Run 39110343731 had no Shufersal: its portal timed out from GitHub's runner on all 5 attempts.
-Until the next run brings it back, Shufersal is missing from the site. Keeping a chain's previous
-data when a fetch fails would avoid this (not done in M6).
+The 09:00 run got Shufersal's Stores file but an empty price listing.
+
+Follow-up (after M6): `.github/scripts/reuse-previous-raw.sh`. When a chain's cloud fetch gets no
+PriceFull files, or a whole fetch job fails, the build takes that chain's raw files from the newest
+earlier pipeline run of the last 48 h that fetched it. Fetch artifacts are now kept for 3 days
+instead of 1. The chain's "updated" time comes from the file names, so the About page shows the
+data's real age and flags it once it is over 48 h old.
 
 ## Tests
 

@@ -40,6 +40,9 @@ chain portals ──▶ pipeline/fetch.py ──▶ raw XML ──▶ pipeline/b
   `.github/workflows/fetch-israel.yml` fetches them on a **self-hosted runner in Israel** (a home PC).
   The pipeline never waits for it: for each of these chains it uses the newest artifact from the last
   48 h. See [docs/self-hosted-runner.md](docs/self-hosted-runner.md).
+- If a chain's fetch gets no price files (a portal timing out), the build keeps that chain's data
+  from the newest earlier run of the last 48 h (`.github/scripts/reuse-previous-raw.sh`). The About
+  page shows its real age.
 - The app ([web/](web/)) loads only what a page needs:
   - a 5 MB (gzipped) search index, built in a Web Worker on first search;
   - one of 1,024 price shards (~24 KB each) per product;

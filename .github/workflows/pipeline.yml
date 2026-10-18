@@ -53,7 +53,7 @@ jobs:
         with:
           name: raw-cloud-${{ matrix.group }}
           path: raw/
-          retention-days: 1
+          retention-days: 3 # later runs reuse it if a chain's fetch fails (reuse-previous-raw.sh)
           if-no-files-found: warn
 
   build:
@@ -75,6 +75,11 @@ jobs:
           pattern: raw-cloud-*
           path: raw
           merge-multiple: true
+
+      - name: Keep last good data for chains whose fetch failed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/reuse-previous-raw.sh raw "${{ github.run_id }}"
 
       - name: Add Israel runner data (if fresh)
         env:
