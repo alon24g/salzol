@@ -84,10 +84,11 @@ export function LocationBar({ place, setPlace, locate, geoStatus, radiusKm, setR
           השתמשו במיקום שלי
         </button>
         <span className="text-stone-500">או</span>
-        <label className="flex items-center gap-2">
+        {/* Fixed width: sized by its options, it would widen and wrap once the cities load. */}
+        <label className="flex w-full items-center gap-2 sm:w-auto">
           <span className="sr-only">בחירת עיר</span>
           <select
-            className="rounded-xl border border-stone-300 bg-white px-3 py-2 focus:border-brand-600 focus:outline-none"
+            className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 focus:border-brand-600 focus:outline-none sm:w-56"
             defaultValue=""
             onChange={(e) => pickCity(e.target.value)}
             data-testid="city-select"

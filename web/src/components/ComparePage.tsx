@@ -68,7 +68,12 @@ export function ComparePage({ place, radiusKm, ctx }: { place: Place | null; rad
         הרשימה ריקה. <a href="#/" className="link">חפשו מוצרים</a> והוסיפו אותם לרשימה.
       </p>
     )
-  if (failed) return <p role="alert" className="text-red-700">טעינת המחירים נכשלה. נסו לרענן את הדף.</p>
+  if (failed)
+    return (
+      <p role="alert" className="text-red-700" data-testid="compare-error">
+        {navigator.onLine ? 'טעינת המחירים נכשלה. נסו לרענן את הדף.' : 'חלק מהמחירים לא נשמרו במכשיר, ואין חיבור לאינטרנט. נסו שוב כשתהיו מחוברים.'}
+      </p>
+    )
   if (!data) return <p className="text-stone-500">מחשב את הסל…</p>
 
   const perChain = view === 'chains' ? bestPerChain(baskets, mode) : []

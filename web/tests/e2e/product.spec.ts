@@ -88,6 +88,15 @@ test.describe('manual city & nationwide view', () => {
     await expect(product.offers).toHaveCount(3)
   })
 
+  test('a blocked location permission falls back to choosing a city', async ({ page }) => {
+    // No geolocation permission granted: the browser refuses.
+    await new ProductPage(page).goto(MILK)
+    await page.getByTestId('locate-me').click()
+    await expect(page.getByTestId('geo-status')).toContainText('בחור עיר')
+    await new LocationBar(page).pickCity('ירושלים')
+    await expect(page.getByTestId('no-place-note')).toBeHidden()
+  })
+
   test('picking a city recomputes nearby prices', async ({ page }) => {
     const product = new ProductPage(page)
     await product.goto(MILK)

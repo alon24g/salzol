@@ -1,15 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadItem, loadSearch } from '../lib/data'
+import { useEffect, useRef, useState } from 'react'
+import { loadItem } from '../lib/data'
 import { listsStore, useLists } from '../lib/lists'
-import { listHref, productHref, searchHref } from '../lib/router'
-import { ProductSearch } from '../lib/search'
-
-let searchPromise: Promise<ProductSearch> | null = null
-function getSearch(): Promise<ProductSearch> {
-  searchPromise ??= loadSearch().then((rows) => new ProductSearch(rows))
-  searchPromise.catch(() => (searchPromise = null))
-  return searchPromise
-}
+import { isStandalone, useOnline } from '../lib/pwa'
+import { listHref, parseHash, productHref, searchHref } from '../lib/router'
+import type { SearchHit } from '../lib/search'
+import { loadSearchIndex, searchProducts } from '../lib/searchClient'
+import { canScan } from '../lib/scanner'
+import { BarcodeScanner } from './BarcodeScanner'
 
 const QUICK = ['חלב', 'ביצים', 'לחם', 'במבה', 'קפה', 'קוטג', 'שמן קנולה', 'אורז', 'טונה', 'קוקה קולה']
 
@@ -23,31 +20,50 @@ type Props = { initialQuery: string; hasPlace: boolean; listCount: number }
 
 export function SearchPage({ initialQuery, hasPlace, listCount }: Props) {
   const [query, setQuery] = useState(initialQuery)
-  const [engine, setEngine] = useState<ProductSearch | null>(null)
+  const [ready, setReady] = useState(false)
   const [error, setError] = useState(false)
+  const [result, setResult] = useState<{ query: string; hits: SearchHit[] } | null>(null)
+  const [scanning, setScanning] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const online = useOnline()
 
-  // The index (~1.4 MB gz) loads on first interaction, not on page load.
+  // The index (~5 MB gz) loads on first interaction, not on page load; the installed app
+  // loads it right away so search is instant (and works offline).
   const ensureLoaded = () => {
-    if (engine) return
-    getSearch()
-      .then(setEngine)
+    if (ready) return
+    setError(false)
+    loadSearchIndex()
+      .then(() => setReady(true))
       .catch(() => setError(true))
   }
   useEffect(() => {
-    if (initialQuery) ensureLoaded()
+    if (initialQuery || isStandalone()) ensureLoaded()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!ready) return
+    let live = true
+    searchProducts(query)
+      .then((hits) => live && setResult({ query, hits }))
+      .catch(() => live && setError(true))
+    return () => {
+      live = false
+    }
+  }, [ready, query])
+
   // Keep the query in the URL so back/forward from a product returns to the results.
   useEffect(() => {
-    const t = setTimeout(() => history.replaceState(null, '', searchHref(query.trim())), 300)
+    // A link clicked just before the timer fires has changed the hash already; keep it.
+    const t = setTimeout(() => parseHash(location.hash).name === 'search' && history.replaceState(null, '', searchHref(query.trim())), 300)
     return () => clearTimeout(t)
   }, [query])
 
   const { active } = useLists()
   const inList = new Set(active.items.map((i) => i.barcode))
-  const hits = useMemo(() => (engine ? engine.search(query) : []), [engine, query])
+  // While the next query runs, keep showing the previous results rather than flashing empty.
+  const hits = result?.hits ?? []
+  const settled = ready && result?.query === query
   const trimmed = query.trim()
 
   const searchFor = (q: string) => {
@@ -70,7 +86,7 @@ export function SearchPage({ initialQuery, hasPlace, listCount }: Props) {
         </div>
       )}
 
-      <div className="relative">
+      <div className="relative flex items-center">
         <span className="pointer-events-none absolute inset-y-0 start-4 flex items-center text-xl" aria-hidden>
           🔍
         </span>
@@ -80,7 +96,7 @@ export function SearchPage({ initialQuery, hasPlace, listCount }: Props) {
           inputMode="search"
           autoComplete="off"
           enterKeyHint="search"
-          className="w-full rounded-2xl border-2 border-stone-200 bg-white py-4 ps-12 pe-4 text-lg shadow-sm transition placeholder:text-stone-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 focus:outline-none"
+          className={`w-full rounded-2xl border-2 border-stone-200 bg-white py-4 ps-12 ${canScan() ? 'pe-16' : 'pe-4'} text-lg shadow-sm transition placeholder:text-stone-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 focus:outline-none`}
           placeholder="מה מחפשים? למשל: חלב, במבה, קפה…"
           aria-label="חיפוש מוצר לפי שם או ברקוד"
           value={query}
@@ -91,7 +107,28 @@ export function SearchPage({ initialQuery, hasPlace, listCount }: Props) {
           }}
           data-testid="search-input"
         />
+        {canScan() && (
+          <button
+            type="button"
+            className="absolute end-2 flex size-12 items-center justify-center rounded-xl text-2xl transition hover:bg-brand-50"
+            aria-label="סריקת ברקוד במצלמה"
+            title="סריקת ברקוד"
+            onClick={() => setScanning(true)}
+            data-testid="scan-barcode"
+          >
+            <span aria-hidden>📷</span>
+          </button>
+        )}
       </div>
+      {scanning && (
+        <BarcodeScanner
+          onClose={() => setScanning(false)}
+          onDetected={(barcode) => {
+            setScanning(false)
+            location.hash = productHref(barcode)
+          }}
+        />
+      )}
 
       {!trimmed && (
         <>
@@ -137,18 +174,22 @@ export function SearchPage({ initialQuery, hasPlace, listCount }: Props) {
       )}
 
       {error && (
-        <p className="text-red-700" role="alert">
-          טעינת המוצרים נכשלה. נסו לרענן את הדף.
+        <p className="text-red-700" role="alert" data-testid="search-error">
+          {online ? 'טעינת המוצרים נכשלה. נסו לרענן את הדף.' : 'אין חיבור לאינטרנט, ורשימת המוצרים עוד לא נשמרה במכשיר. נסו שוב כשתהיו מחוברים.'}
         </p>
       )}
-      {!engine && !error && trimmed.length > 0 && <p className="text-stone-500">טוען מוצרים…</p>}
-      {engine && trimmed.length >= 2 && hits.length === 0 && (
+      {!ready && !error && trimmed.length > 0 && (
+        <p className="text-stone-500" data-testid="search-loading">
+          טוען מוצרים…
+        </p>
+      )}
+      {settled && trimmed.length >= 2 && hits.length === 0 && (
         <p className="card p-4 text-center text-stone-600" data-testid="search-empty">
           לא מצאנו מוצרים עבור „{trimmed}”. נסו מילה אחרת או ברקוד.
         </p>
       )}
 
-      {hits.length > 0 && (
+      {trimmed.length > 0 && hits.length > 0 && (
         <ul className="card divide-y divide-stone-100 overflow-hidden" data-testid="search-results">
           {hits.map((h) => (
             <li key={h.barcode} className="flex items-stretch">

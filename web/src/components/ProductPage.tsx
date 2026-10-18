@@ -5,6 +5,7 @@ import { formatKm, formatPrice, formatUpdated } from '../lib/format'
 import { chainOffers, chainsOutOfRange, RADIUS_OPTIONS, radiusToReach, unitPrice, type ChainOffer, type Place } from '../lib/nearby'
 import { chainSiteLink } from '../lib/chainSites'
 import { listsStore, useLists } from '../lib/lists'
+import { useOnline } from '../lib/pwa'
 import { promoLabel, type Blocker, type PricingContext, type Promo } from '../lib/promos'
 import { listHref } from '../lib/router'
 import type { ItemPrices, Meta, StoresByChain } from '../lib/types'
@@ -51,13 +52,19 @@ export function ProductPage({ barcode, place, radiusKm, setRadius, ctx }: Props)
   const qty = qtyFor?.barcode === barcode ? qtyFor.qty : 1
   const { active } = useLists()
   const listed = active.items.find((i) => i.barcode === barcode)
+  const online = useOnline()
 
   const offers = useMemo(
     () => (data?.item ? chainOffers(data.item, data.stores, place, { radiusKm, qty, ctx, promos: data.promos }) : []),
     [data, place, radiusKm, qty, ctx],
   )
 
-  if (error) return <p role="alert" className="text-red-700">טעינת המוצר נכשלה. נסו לרענן את הדף.</p>
+  if (error)
+    return (
+      <p role="alert" className="text-red-700" data-testid="product-error">
+        {online ? 'טעינת המוצר נכשלה. נסו לרענן את הדף.' : 'המוצר הזה לא נשמר במכשיר, ואין חיבור לאינטרנט. נסו שוב כשתהיו מחוברים.'}
+      </p>
+    )
   if (!data) return <p className="text-stone-500">טוען…</p>
   if (!data.item)
     return (

@@ -10,10 +10,18 @@ const DATA = `${import.meta.env.BASE_URL}data/`
 
 const cache = new Map<string, Promise<unknown>>()
 
+/** Every file except meta.json is requested as `<file>?v=<built_at>`: the service worker (sw/sw.js)
+ *  keeps those for offline use and drops them once a newer build is published. */
+async function dataUrl(file: string): Promise<string> {
+  if (file === 'meta.json') return DATA + file
+  const meta = await loadMeta()
+  return `${DATA}${file}?v=${encodeURIComponent(meta.built_at)}`
+}
+
 function getJson<T>(file: string): Promise<T> {
   let p = cache.get(file)
   if (!p) {
-    p = fetch(DATA + file).then((r) => {
+    p = dataUrl(file).then(fetch).then((r) => {
       if (!r.ok) throw new Error(`${file}: HTTP ${r.status}`)
       return r.json()
     })
@@ -64,4 +72,17 @@ export async function loadItemPromos(item: ItemPrices): Promise<Record<string, P
     }),
   )
   return out
+}
+
+/** Loads what comparing the shopping list needs, so the service worker has it for offline use
+ *  in the store (a new data build drops the old copies). */
+export async function warmForOffline(barcodes: string[]): Promise<void> {
+  await Promise.all([
+    loadStores(),
+    loadCities(),
+    ...barcodes.map(async (b) => {
+      const item = await loadItem(b)
+      if (item) await loadItemPromos(item)
+    }),
+  ])
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { AboutPage } from './components/AboutPage'
 import { ComparePage } from './components/ComparePage'
 import { Footer } from './components/Footer'
@@ -8,8 +9,10 @@ import { PricingSettings } from './components/PricingSettings'
 import { ProductPage } from './components/ProductPage'
 import { SearchPage } from './components/SearchPage'
 import { SharePage } from './components/SharePage'
+import { warmForOffline } from './lib/data'
 import { useLists } from './lib/lists'
 import { usePlace } from './lib/location'
+import { useOnline } from './lib/pwa'
 import { listHref, useRoute } from './lib/router'
 import { usePricingSettings } from './lib/settings'
 
@@ -18,6 +21,22 @@ export default function App() {
   const { place, setPlace, locate, geoStatus, radiusKm, setRadius } = usePlace()
   const { ctx, today, setDay, toggleClub } = usePricingSettings()
   const { active } = useLists()
+  const online = useOnline()
+
+  // Keep the list's prices on the device for offline use, once the service worker is active.
+  const listKey = active.items.map((i) => i.barcode).join(',')
+  useEffect(() => {
+    if (!online || !navigator.serviceWorker) return
+    let t: ReturnType<typeof setTimeout> | undefined
+    let live = true
+    navigator.serviceWorker.ready.then(() => {
+      if (live) t = setTimeout(() => warmForOffline(listKey ? listKey.split(',') : []).catch(() => {}), 2000)
+    })
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [online, listKey])
   const tab = (on: boolean) =>
     `flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition ${
       on ? 'bg-brand-700 text-white shadow-sm' : 'text-stone-700 hover:bg-white'
@@ -54,7 +73,13 @@ export default function App() {
           <PricingSettings ctx={ctx} today={today} setDay={setDay} toggleClub={toggleClub} />
         </div>
       </header>
-      <main className="flex-1">
+      {!online && (
+        <p className="mb-4 rounded-2xl bg-stone-800 px-4 py-2.5 text-sm text-white" role="status" data-testid="offline-banner">
+          <span aria-hidden>📴</span> אין חיבור לאינטרנט. מוצגים המחירים ששמרנו במכשיר מהביקור האחרון.
+        </p>
+      )}
+      {/* min-height keeps the footer below the fold while a page loads, so it doesn't jump. */}
+      <main className="min-h-[75dvh] flex-1">
         {route.name === 'product' ? (
           <ProductPage barcode={route.barcode} place={place} radiusKm={radiusKm} setRadius={setRadius} ctx={ctx} />
         ) : route.name === 'list' ? (
