@@ -63,13 +63,26 @@ Two fixes came out of the audit:
 - **Footer jumping on the product page (CLS 0.20 → 0).** `<main>` now has a minimum height, so the
   footer starts below the fold while the page loads.
 
-| Page | Performance | Accessibility | Best practices | SEO |
-|---|---|---|---|---|
-| Home (local preview, full data) | 98–99 | 100 | 100 | 100 |
-| Product (local preview, full data) | 75 | 100 | 100 | 100 |
+Live site (GitHub Pages), 2026-10-18, two runs each:
 
-The local preview server doesn't compress files, so the product page downloads about 1.6 MB raw
-(store list, price shard, promotion chunks). GitHub Pages gzips them. See the live numbers below.
+| Page | Performance | Accessibility | Best practices | SEO | LCP | CLS |
+|---|---|---|---|---|---|---|
+| Home | 96–97 | 100 | 100 | 100 | 1.8–1.9 s | 0 |
+| Product (`#/p/7290116936291`) | 93–96 | 100 | 100 | 100 | 2.6–2.7 s | 0 |
+
+The local preview server doesn't compress files, which made the product page score 75 there.
+
+A live smoke test from the home PC:
+
+- first search 3.4 s (the page stays responsive meanwhile), the next one 15 ms;
+- the product page reloads offline with all its prices;
+- no console errors.
+
+## Seen during the deploy
+
+Run 39110343731 had no Shufersal: its portal timed out from GitHub's runner on all 5 attempts.
+Until the next run brings it back, Shufersal is missing from the site. Keeping a chain's previous
+data when a fetch fails would avoid this (not done in M6).
 
 ## Tests
 
